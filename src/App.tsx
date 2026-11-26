@@ -311,23 +311,62 @@ export default function App() {
     return `${baseChapter(chapter)}|${normalizeText(lessonTitle(chapter))}`;
   }
 
-  function lessonMatches(q: { chapter: string; dang?: string; content?: string }, selectedLesson: string): boolean {
-    if (!selectedLesson) return false;
-    if (lessonKey(q.chapter) === lessonKey(selectedLesson)) return true;
-    if (baseChapter(q.chapter) !== baseChapter(selectedLesson)) return false;
+  function lessonScore(q: { chapter: string; dang?: string; content?: string }, selectedLesson: string): number {
+    if (lessonKey(q.chapter) === lessonKey(selectedLesson)) return 100;
+    if (baseChapter(q.chapter) !== baseChapter(selectedLesson)) return 0;
     const title = normalizeText(lessonTitle(selectedLesson));
+    const dang = normalizeText(q.dang ?? '');
     const text = normalizeText(`${q.dang ?? ''} ${q.content ?? ''}`);
-    if (!title || !text) return false;
-    if (text.includes(title)) return true;
-    const tokens = title.split(' ').filter((t) => t.length >= 3);
+    if (!title || !text) return 0;
+    let score = 0;
+    if (dang.includes(title)) score += 12;
+    else if (text.includes(title)) score += 8;
+    const tokens = title.split(' ').filter((t) => t.length >= 3 && !['cua', 'trong', 'va', 'hai', 'mot', 'cac', 'bai', 'tap', 'cuoi', 'chuong', 'on'].includes(t));
     const bigrams = tokens.slice(0, -1).map((t, i) => `${t} ${tokens[i + 1]}`);
-    if (bigrams.some((b) => text.includes(b))) return true;
-    if (title.includes('toa do') && text.includes('toa do')) return true;
-    if (title.includes('tich vo huong') && text.includes('tich vo huong')) return true;
-    if (title.includes('tong va hieu') && (text.includes('tong') || text.includes('hieu'))) return true;
-    if (title.includes('tich cua mot vecto voi mot so') && (text.includes('tich cua mot vecto') || text.includes('cung phuong') || text.includes('he so k'))) return true;
-    if (title.includes('khai niem mo dau') && (text.includes('phuong huong') || text.includes('do dai') || text.includes('bang nhau') || text.includes('vectơ doi') || text.includes('vecto doi'))) return true;
-    return false;
+    for (const b of bigrams) { if (dang.includes(b)) score += 4; else if (text.includes(b)) score += 2; }
+    for (const t of tokens) { if (t.length >= 5 && dang.includes(t)) score += 1; }
+    const has = (s: string) => dang.includes(s) || text.includes(s);
+    if (title.includes('toa do') && has('toa do')) score += 6;
+    if (title.includes('tich vo huong') && has('tich vo huong')) score += 8;
+    if (title.includes('tich vo huong') && has('goc giua hai vecto')) score += 5;
+    if (title.includes('tong va hieu') && (has('tong') || has('hieu') || has('quy tac ba diem') || has('quy tac hinh binh hanh') || has('vecto doi'))) score += 6;
+    if (title.includes('tich cua mot vecto') && (has('cung phuong') || has('trung diem') || has('trong tam') || has('phan tich vecto') || has('bieu dien vecto') || has('diem thoa man dang thuc'))) score += 6;
+    if (title.includes('khai niem mo dau') && (has('phuong huong') || has('do dai') || has('bang nhau') || has('khai niem'))) score += 6;
+    if (title.includes('cap so cong') && has('cap so cong')) score += 8;
+    if (title.includes('cap so nhan') && has('cap so nhan')) score += 8;
+    if (title.includes('gioi han') && has('gioi han')) score += 6;
+    if (title.includes('lien tuc') && has('lien tuc')) score += 6;
+    if (title.includes('dao ham') && has('dao ham')) score += 6;
+    if (title.includes('nguyen ham') && has('nguyen ham')) score += 8;
+    if (title.includes('tich phan') && has('tich phan')) score += 8;
+    if (title.includes('xac suat') && has('xac suat')) score += 6;
+    if (title.includes('song song') && has('song song')) score += 6;
+    if (title.includes('vuong goc') && has('vuong goc')) score += 6;
+    if (title.includes('mat phang') && has('mat phang')) score += 4;
+    if (title.includes('duong thang') && has('duong thang')) score += 4;
+    if (title.includes('mat cau') && has('mat cau')) score += 8;
+    if (title.includes('logarit') && (has('logarit') || has('log '))) score += 6;
+    if (title.includes('ham so mu') && has('mu')) score += 4;
+    if (title.includes('luong giac') && has('luong giac')) score += 6;
+    if (title.includes('tap hop') && has('tap hop')) score += 6;
+    if (title.includes('menh de') && has('menh de')) score += 6;
+    return score;
+  }
+
+  function classifyLesson(q: { chapter: string; dang?: string; content?: string }, candidates: string[]): string {
+    let best = '';
+    let bestScore = 0;
+    for (const c of candidates) {
+      const s = lessonScore(q, c);
+      if (s > bestScore) { bestScore = s; best = c; }
+    }
+    return bestScore >= 4 ? best : '';
+  }
+
+  function lessonMatches(q: { chapter: string; dang?: string; content?: string }, selectedLesson: string, candidates?: string[]): boolean {
+    if (!selectedLesson) return false;
+    if (candidates && candidates.length) return classifyLesson(q, candidates) === selectedLesson;
+    return lessonScore(q, selectedLesson) >= 4;
   }
 
   async function loadScopes(gradeValue = mGrade) {
@@ -358,8 +397,16 @@ export default function App() {
           if (!lessonMap.has(key)) lessonMap.set(key, { name: display, base, count: 0 });
         }
       }
+      const candidatesByBase = new Map<string, string[]>();
       for (const lesson of lessonMap.values()) {
-        lesson.count = scopeRows.filter((r) => lessonMatches(r, lesson.name)).length;
+        const arr = candidatesByBase.get(lesson.base) ?? [];
+        arr.push(lesson.name);
+        candidatesByBase.set(lesson.base, arr);
+      }
+      for (const r of scopeRows) {
+        const assigned = classifyLesson(r, candidatesByBase.get(baseChapter(r.chapter)) ?? []);
+        const lesson = assigned ? lessonMap.get(lessonKey(assigned)) : undefined;
+        if (lesson) lesson.count += 1;
       }
       const lessons = [...lessonMap.values()];
       const chapters = [...chapterMap.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => a.name.localeCompare(b.name, 'vi'));
@@ -388,7 +435,11 @@ export default function App() {
       if (rows.length < limit) break;
     }
     if (scopeMode === 'chapter') return all.filter((q) => baseChapter(q.chapter) === mChapter);
-    if (scopeMode === 'lesson') return all.filter((q) => lessonMatches(q, mLesson));
+    if (scopeMode === 'lesson') {
+      const base = baseChapter(mLesson);
+      const candidates = scopeLessons.filter((l) => l.base === base).map((l) => l.name);
+      return all.filter((q) => lessonMatches(q, mLesson, candidates.length ? candidates : [mLesson]));
+    }
     return all;
   }
 
