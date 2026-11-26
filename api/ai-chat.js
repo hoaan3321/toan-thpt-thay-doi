@@ -98,12 +98,15 @@ export default async function handler(req, res) {
           context,
         });
       } else if (p === 'gemini') {
-        text = await callGemini({
-          key: process.env.GEMINI_API_KEY,
-          model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
-          messages,
-          context,
-        });
+        const models = [...new Set([process.env.GEMINI_MODEL, 'gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-3.8-flash', 'gemini-flash-lite-latest', 'gemini-2.5-flash'].filter(Boolean))];
+        let lastError = null;
+        for (const model of models) {
+          try {
+            text = await callGemini({ key: process.env.GEMINI_API_KEY, model, messages, context });
+            if (text.trim()) break;
+          } catch (e) { lastError = e; }
+        }
+        if (!text.trim() && lastError) throw lastError;
       } else if (p === 'openai') {
         text = await callOpenAICompatible({
           url: 'https://api.openai.com/v1/chat/completions',
