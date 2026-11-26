@@ -187,3 +187,29 @@ drop policy if exists "assignments_authenticated_all" on public.assignments;
 create policy "assignments_authenticated_all" on public.assignments for all to authenticated using (true) with check (true);
 drop policy if exists "submissions_authenticated_all" on public.submissions;
 create policy "submissions_authenticated_all" on public.submissions for all to authenticated using (true) with check (true);
+
+-- Cập nhật luồng giao bài online: giáo viên đăng nhập để tạo đề/giao bài/xem kết quả;
+-- học sinh vào bằng mã giao bài, đọc đề và nộp bài không cần tài khoản.
+alter table public.exams add column if not exists duration_minutes integer not null default 45;
+alter table public.assignments add column if not exists title text not null default '';
+alter table public.assignments add column if not exists duration_minutes integer not null default 45;
+alter table public.assignments add column if not exists show_result boolean not null default true;
+alter table public.submissions add column if not exists class_name text not null default '';
+alter table public.submissions add column if not exists auto_score numeric(6, 2);
+alter table public.submissions add column if not exists essay_score numeric(6, 2);
+alter table public.submissions add column if not exists status text not null default 'submitted';
+alter table public.submissions add column if not exists graded_at timestamptz;
+
+grant select on public.exams, public.assignments, public.classes, public.students to anon;
+grant insert on public.submissions to anon;
+
+drop policy if exists "exams_anon_select" on public.exams;
+create policy "exams_anon_select" on public.exams for select to anon using (true);
+drop policy if exists "assignments_anon_select" on public.assignments;
+create policy "assignments_anon_select" on public.assignments for select to anon using (true);
+drop policy if exists "classes_anon_select" on public.classes;
+create policy "classes_anon_select" on public.classes for select to anon using (true);
+drop policy if exists "students_anon_select" on public.students;
+create policy "students_anon_select" on public.students for select to anon using (true);
+drop policy if exists "submissions_anon_insert" on public.submissions;
+create policy "submissions_anon_insert" on public.submissions for insert to anon with check (true);

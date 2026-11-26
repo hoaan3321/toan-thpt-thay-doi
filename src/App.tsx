@@ -1,14 +1,70 @@
 import { useEffect, useMemo, useState } from 'react';
 import MathText from './MathText';
-import { eqParams, ilike, isSupabaseConfigured, supabaseCount, supabaseGet } from './supabase';
-import { LEVELS, QTYPES, QTYPE_LABEL, type Level, type QType, type Question, type TheoryNote } from './types';
+import { eqParams, getSession, ilike, isSupabaseConfigured, signIn, signOut, signUp, supabaseCount, supabaseDelete, supabaseGet, supabaseInsert, supabaseUpdate, type AuthSession } from './supabase';
+import { LEVELS, QTYPES, QTYPE_LABEL, type Assignment, type ClassRecord, type ExamRecord, type Level, type QType, type Question, type StudentRecord, type Submission, type TheoryNote } from './types';
 
-type Tab = 'overview' | 'bank' | 'theory' | 'matrix' | 'print';
+type Tab = 'overview' | 'bank' | 'theory' | 'matrix' | 'print' | 'assign' | 'take' | 'results' | 'admin';
 
 interface GeneratedCode {
   code: number;
   questions: Question[];
   rawPoints: number;
+}
+
+function makeJoinCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+}
+
+function normText(s: unknown): string {
+  return String(s ?? '')
+    .replace(/\$/g, '')
+    .replace(/\\,/g, '')
+    .replace(/\s+/g, '')
+    .replace(/,/g, '.')
+    .toLowerCase();
+}
+
+function stripOptionPrefix(s: string): string {
+  return s.replace(/^\s*[A-D][.)]\s*/i, '').trim();
+}
+
+function gradeQuestion(q: Question, answer: unknown): { score: number; pending: boolean; note: string } {
+  const points = Number(q.points || 0);
+  if (q.qtype === 'essay') return { score: 0, pending: true, note: 'Tự luận chờ giáo viên chấm' };
+  if (q.qtype === 'single') {
+    const idx = Number(answer);
+    if (!Number.isInteger(idx) || idx < 0) return { score: 0, pending: false, note: 'Chưa chọn đáp án' };
+    const correct = q.correct.trim();
+    const letter = correct.match(/^([A-D])[.)]/i)?.[1]?.toUpperCase();
+    const selected = q.options?.[idx] ?? '';
+    const ok = letter ? 'ABCD'[idx] === letter : normText(stripOptionPrefix(selected)) === normText(stripOptionPrefix(correct));
+    return { score: ok ? points : 0, pending: false, note: ok ? 'Đúng' : 'Sai' };
+  }
+  if (q.qtype === 'tf') {
+    const ans = (answer ?? {}) as Record<string, string>;
+    const expected: Record<string, boolean> = {};
+    for (const m of q.correct.matchAll(/([a-d])\)\s*(Đúng|Sai)/gi)) expected[m[1].toLowerCase()] = m[2].toLowerCase() === 'đúng';
+    let right = 0;
+    for (const k of ['a', 'b', 'c', 'd']) if (ans[k] && (ans[k] === 'Đúng') === expected[k]) right++;
+    const scale = [0, 0.1, 0.25, 0.5, 1][right] ?? 0;
+    return { score: points * scale, pending: false, note: `${right}/4 ý đúng` };
+  }
+  const got = normText(answer);
+  const want = normText(q.correct);
+  const gotNum = Number(got);
+  const wantNum = Number(want);
+  const ok = got !== '' && (got === want || (Number.isFinite(gotNum) && Number.isFinite(wantNum) && Math.abs(gotNum - wantNum) < 1e-9));
+  return { score: ok ? points : 0, pending: false, note: ok ? 'Đúng' : 'Sai' };
+}
+
+function downloadText(filename: string, text: string, type = 'text/plain;charset=utf-8') {
+  const blob = new Blob([text], { type });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 function shuffle<T>(arr: T[]): T[] {
@@ -140,6 +196,32 @@ export default function App() {
   const [partNeed, setPartNeed] = useState<Record<QType, number>>({ single: 8, tf: 3, short: 3, essay: 2 });
   const [generated, setGenerated] = useState<GeneratedCode[]>([]);
   const [matrixMsg, setMatrixMsg] = useState('');
+  const [session, setSession] = useState<AuthSession | null>(() => getSession());
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [examTitle, setExamTitle] = useState('Đề Toán THPT');
+  const [duration, setDuration] = useState(45);
+  const [classes, setClasses] = useState<ClassRecord[]>([]);
+  const [students, setStudents] = useState<StudentRecord[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [exams, setExams] = useState<ExamRecord[]>([]);
+  const [className, setClassName] = useState('');
+  const [classGrade, setClassGrade] = useState(12);
+  const [studentNames, setStudentNames] = useState('');
+  const [selectedClassId, setSelectedClassId] = useState('');
+  const [joinCode, setJoinCode] = useState('');
+  const [studentName, setStudentName] = useState('');
+  const [takeClassName, setTakeClassName] = useState('');
+  const [takeAssignment, setTakeAssignment] = useState<Assignment | null>(null);
+  const [takeExam, setTakeExam] = useState<ExamRecord | null>(null);
+  const [takeQuestions, setTakeQuestions] = useState<Question[]>([]);
+  const [takeCodeIndex, setTakeCodeIndex] = useState(0);
+  const [answers, setAnswers] = useState<Record<string, unknown>>({});
+  const [takeResult, setTakeResult] = useState('');
+  const [resultAssignmentId, setResultAssignmentId] = useState('');
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [essayScores, setEssayScores] = useState<Record<string, string>>({});
+  const [adminForm, setAdminForm] = useState({ id: '', grade: 12, chapter: '', dang: '', level: 'NB', qtype: 'single', content: '', options: '', correct: '', explanation: '', points: 0.25 });
 
   const bankParams = useMemo(() => {
     const p = eqParams({ grade, level: level || undefined, qtype: qtype || undefined });
@@ -274,9 +356,242 @@ export default function App() {
     } finally { setLoading(false); }
   }
 
+  async function loadTeacherData() {
+    if (!isSupabaseConfigured || !session) return;
+    try {
+      const p = new URLSearchParams({ select: '*', order: 'id.desc', limit: '100' });
+      const [cs, ss, as, es] = await Promise.all([
+        supabaseGet<ClassRecord[]>('classes', p, true),
+        supabaseGet<StudentRecord[]>('students', p, true),
+        supabaseGet<Assignment[]>('assignments', p, true),
+        supabaseGet<ExamRecord[]>('exams', p, true),
+      ]);
+      setClasses(cs); setStudents(ss); setAssignments(as); setExams(es);
+      if (!resultAssignmentId && as[0]) setResultAssignmentId(String(as[0].id));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function handleSignIn() {
+    setLoading(true); setError('');
+    try {
+      const s = await signIn(email.trim(), password);
+      setSession(s);
+      setMatrixMsg('Đã đăng nhập giáo viên.');
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setLoading(false); }
+  }
+
+  async function handleSignUp() {
+    setLoading(true); setError('');
+    try {
+      const s = await signUp(email.trim(), password);
+      if (s) { setSession(s); setMatrixMsg('Đã tạo tài khoản và đăng nhập.'); }
+      else setMatrixMsg('Đã tạo tài khoản. Nếu Supabase yêu cầu xác nhận email, hãy xác nhận rồi đăng nhập.');
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setLoading(false); }
+  }
+
+  async function createClassAndStudents() {
+    if (!session) { setError('Hãy đăng nhập giáo viên trước.'); return; }
+    setLoading(true); setError('');
+    try {
+      const created = await supabaseInsert<ClassRecord[]>('classes', { name: className.trim(), grade: classGrade }, true);
+      const cls = created[0];
+      const names = studentNames.split('\n').map((x) => x.trim()).filter(Boolean);
+      if (cls && names.length) await supabaseInsert('students', names.map((full_name) => ({ class_id: cls.id, full_name })), true);
+      setClassName(''); setStudentNames('');
+      await loadTeacherData();
+      setMatrixMsg('Đã tạo lớp/học sinh.');
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setLoading(false); }
+  }
+
+  async function saveGeneratedAsAssignment() {
+    if (!session) { setError('Hãy đăng nhập giáo viên trước khi giao bài.'); setTab('assign'); return; }
+    if (!generated.length) { setError('Hãy sinh mã đề trước.'); return; }
+    setLoading(true); setError('');
+    try {
+      const examRows = await supabaseInsert<ExamRecord[]>('exams', {
+        title: examTitle.trim() || `Đề Toán lớp ${mGrade}`,
+        grade: mGrade,
+        scope_chapter: mChapter.trim(),
+        scope_lesson: mLesson.trim(),
+        matrix: { levelNeed, partNeed },
+        codes: generated.map((c) => ({ code: c.code, questionIds: c.questions.map((q) => q.id), rawPoints: c.rawPoints })),
+        duration_minutes: duration,
+      }, true);
+      const exam = examRows[0];
+      const code = makeJoinCode();
+      await supabaseInsert('assignments', {
+        exam_id: exam.id,
+        class_id: selectedClassId ? Number(selectedClassId) : null,
+        join_code: code,
+        title: exam.title,
+        duration_minutes: duration,
+        show_result: true,
+        is_open: true,
+      }, true);
+      await loadTeacherData();
+      setJoinCode(code);
+      setMatrixMsg(`Đã giao bài. Mã vào làm bài: ${code}`);
+      setTab('assign');
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setLoading(false); }
+  }
+
+  async function loadQuestionsByIds(ids: number[]): Promise<Question[]> {
+    if (!ids.length) return [];
+    const p = new URLSearchParams();
+    p.set('select', '*');
+    p.set('id', `in.(${ids.join(',')})`);
+    const rows = await supabaseGet<Question[]>('questions', p);
+    const byId = new Map(rows.map((q) => [q.id, q]));
+    return ids.map((id) => byId.get(id)).filter(Boolean) as Question[];
+  }
+
+  async function startTake() {
+    setLoading(true); setError(''); setTakeResult(''); setAnswers({});
+    try {
+      const p = eqParams({ join_code: joinCode.trim().toUpperCase() });
+      p.set('select', '*');
+      const as = await supabaseGet<Assignment[]>('assignments', p);
+      const assignment = as[0];
+      if (!assignment || !assignment.is_open) throw new Error('Mã giao bài không đúng hoặc bài đã đóng.');
+      const ep = eqParams({ id: assignment.exam_id });
+      ep.set('select', '*');
+      const es = await supabaseGet<ExamRecord[]>('exams', ep);
+      const exam = es[0];
+      if (!exam) throw new Error('Không tìm thấy đề của bài giao này.');
+      const nameKey = studentName.trim() || 'hoc-sinh';
+      const hash = [...nameKey].reduce((s, ch) => s + ch.charCodeAt(0), 0);
+      const idx = exam.codes.length ? hash % exam.codes.length : 0;
+      setTakeAssignment(assignment); setTakeExam(exam); setTakeCodeIndex(idx);
+      setTakeQuestions(await loadQuestionsByIds(exam.codes[idx]?.questionIds ?? []));
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setLoading(false); }
+  }
+
+  async function submitTake() {
+    if (!takeAssignment || !takeExam) return;
+    if (!studentName.trim()) { setError('Học sinh nhập họ tên trước khi nộp.'); return; }
+    setLoading(true); setError('');
+    try {
+      let auto = 0;
+      let pendingEssay = false;
+      const detail: Record<string, unknown> = {};
+      for (const q of takeQuestions) {
+        const g = gradeQuestion(q, answers[String(q.id)]);
+        auto += g.score;
+        pendingEssay = pendingEssay || g.pending;
+        detail[String(q.id)] = g;
+      }
+      const raw = takeQuestions.reduce((s, q) => s + Number(q.points || 0), 0);
+      const scaled = raw > 0 ? (auto / raw) * 10 : 0;
+      await supabaseInsert('submissions', {
+        assignment_id: takeAssignment.id,
+        student_name: studentName.trim(),
+        class_name: takeClassName.trim(),
+        code_index: takeCodeIndex,
+        answers,
+        score: auto,
+        auto_score: auto,
+        essay_score: pendingEssay ? null : 0,
+        detail,
+        status: pendingEssay ? 'waiting_essay' : 'graded',
+      });
+      setTakeResult(pendingEssay
+        ? `Đã nộp. Điểm tự động tạm tính: ${auto.toFixed(2)}/${raw.toFixed(2)} (quy đổi ${scaled.toFixed(2)}/10). Phần tự luận chờ giáo viên chấm.`
+        : `Đã nộp. Điểm: ${auto.toFixed(2)}/${raw.toFixed(2)} (quy đổi ${scaled.toFixed(2)}/10).`);
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setLoading(false); }
+  }
+
+  async function loadSubmissions(assignmentId = resultAssignmentId) {
+    if (!session || !assignmentId) return;
+    setLoading(true); setError('');
+    try {
+      const p = eqParams({ assignment_id: Number(assignmentId) });
+      p.set('select', '*');
+      p.set('order', 'submitted_at.desc');
+      p.set('limit', '300');
+      setSubmissions(await supabaseGet<Submission[]>('submissions', p, true));
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setLoading(false); }
+  }
+
+  async function gradeEssay(sub: Submission) {
+    const essay = Number(essayScores[String(sub.id)] ?? sub.essay_score ?? 0);
+    const auto = Number(sub.auto_score ?? sub.score ?? 0);
+    setLoading(true); setError('');
+    try {
+      await supabaseUpdate('submissions', eqParams({ id: sub.id }), {
+        essay_score: essay,
+        score: auto + essay,
+        status: 'graded',
+        graded_at: new Date().toISOString(),
+      }, true);
+      await loadSubmissions();
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setLoading(false); }
+  }
+
+  function exportResultsCsv() {
+    const rows = [['Họ tên', 'Lớp', 'Mã đề', 'Điểm', 'Điểm tự động', 'Điểm tự luận', 'Trạng thái', 'Thời gian nộp']];
+    for (const s of submissions) rows.push([s.student_name, s.class_name ?? '', String(s.code_index + 1), String(s.score ?? ''), String(s.auto_score ?? ''), String(s.essay_score ?? ''), s.status ?? '', s.submitted_at ?? '']);
+    downloadText('ket-qua.csv', rows.map((r) => r.map((x) => `"${String(x).replace(/"/g, '""')}"`).join(',')).join('\n'), 'text/csv;charset=utf-8');
+  }
+
+  function exportWord() {
+    const html = generated.map((code) => `<h2>Đề Toán lớp ${mGrade} — Mã đề ${String(code.code).padStart(2, '0')}</h2>` + QTYPES.map((qt) => {
+      const qs = code.questions.filter((q) => q.qtype === qt);
+      return qs.length ? `<h3>${QTYPE_LABEL[qt]}</h3>` + qs.map((q, i) => `<p><b>Câu ${i + 1}.</b> ${q.content}</p>${q.options?.length ? `<ol>${q.options.map((op) => `<li>${op}</li>`).join('')}</ol>` : ''}${showAnswers ? `<p><b>Đáp án:</b> ${q.correct}</p><p>${q.explanation}</p>` : ''}`).join('') : '';
+    }).join('')).join('<hr/>');
+    downloadText('de-toan.doc', `<html><head><meta charset="utf-8"></head><body>${html}</body></html>`, 'application/msword;charset=utf-8');
+  }
+
+  async function loadAdminQuestion() {
+    if (!adminForm.id) return;
+    setLoading(true); setError('');
+    try {
+      const p = eqParams({ id: Number(adminForm.id) });
+      p.set('select', '*');
+      const rows = await supabaseGet<Question[]>('questions', p, true);
+      const q = rows[0];
+      if (!q) throw new Error('Không tìm thấy câu hỏi.');
+      setAdminForm({ id: String(q.id), grade: q.grade, chapter: q.chapter, dang: q.dang, level: q.level, qtype: q.qtype, content: q.content, options: (q.options ?? []).join('\n'), correct: q.correct, explanation: q.explanation, points: Number(q.points || 0) });
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setLoading(false); }
+  }
+
+  async function saveAdminQuestion() {
+    if (!session) { setError('Hãy đăng nhập giáo viên trước.'); return; }
+    setLoading(true); setError('');
+    try {
+      const body = {
+        grade: Number(adminForm.grade), chapter: adminForm.chapter, dang: adminForm.dang, level: adminForm.level, qtype: adminForm.qtype,
+        content: adminForm.content, options: adminForm.options.split('\n').map((x) => x.trim()).filter(Boolean),
+        correct: adminForm.correct, explanation: adminForm.explanation, points: Number(adminForm.points || 0), image_key: '', image_url: '', geogebra: '',
+      };
+      if (adminForm.id) await supabaseUpdate('questions', eqParams({ id: Number(adminForm.id) }), body, true);
+      else {
+        const rows = await supabaseInsert<Question[]>('questions', { id: Date.now(), ...body }, true);
+        if (rows[0]) setAdminForm({ ...adminForm, id: String(rows[0].id) });
+      }
+      setMatrixMsg('Đã lưu câu hỏi.');
+      await loadOverview();
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setLoading(false); }
+  }
+
+  async function deleteAdminQuestion() {
+    if (!session || !adminForm.id) return;
+    if (!window.confirm('Xóa câu hỏi này?')) return;
+    setLoading(true); setError('');
+    try {
+      await supabaseDelete('questions', eqParams({ id: Number(adminForm.id) }), true);
+      setAdminForm({ ...adminForm, id: '' });
+      setMatrixMsg('Đã xóa câu hỏi.');
+      await loadOverview();
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setLoading(false); }
+  }
+
   useEffect(() => { void loadOverview(); }, []);
   useEffect(() => { if (tab === 'bank') void loadBank(0); }, [tab]);
   useEffect(() => { if (tab === 'theory') void loadTheory(); }, [tab, theoryGrade]);
+  useEffect(() => { if (session) void loadTeacherData(); }, [session]);
+  useEffect(() => { if (tab === 'results' && session) void loadSubmissions(); }, [tab, session]);
 
   return (
     <div className="app">
@@ -286,7 +601,7 @@ export default function App() {
           <p>Ngân hàng câu hỏi, lý thuyết và ma trận đề Toán THPT</p>
         </div>
         <nav>
-          {([['overview', 'Tổng quan'], ['bank', 'Ngân hàng câu hỏi'], ['theory', 'Lý thuyết'], ['matrix', 'Tạo đề'], ['print', 'In đề']] as [Tab, string][]).map(([t, label]) => (
+          {([['overview', 'Tổng quan'], ['bank', 'Ngân hàng câu hỏi'], ['theory', 'Lý thuyết'], ['matrix', 'Tạo đề'], ['print', 'In đề'], ['assign', 'Giao bài'], ['take', 'Học sinh làm bài'], ['results', 'Kết quả'], ['admin', 'Quản trị']] as [Tab, string][]).map(([t, label]) => (
             <button key={t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)}>{label}</button>
           ))}
         </nav>
@@ -299,6 +614,18 @@ export default function App() {
       )}
       {error && <section className="notice danger no-print">{error}</section>}
       {loading && <p className="muted no-print">Đang tải…</p>}
+      <section className="card no-print">
+        {session ? (
+          <div className="filters"><strong>Giáo viên: {session.user?.email ?? 'đã đăng nhập'}</strong><button onClick={() => { signOut(); setSession(null); }}>Đăng xuất</button></div>
+        ) : (
+          <div className="filters">
+            <label>Email giáo viên<input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email" /></label>
+            <label>Mật khẩu<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="mật khẩu" /></label>
+            <button className="primary" onClick={() => void handleSignIn()}>Đăng nhập</button>
+            <button onClick={() => void handleSignUp()}>Tạo tài khoản</button>
+          </div>
+        )}
+      </section>
 
       {tab === 'overview' && (
         <main className="grid">
@@ -360,6 +687,13 @@ export default function App() {
           <div className="filters">{QTYPES.map((q) => <label key={q}>{QTYPE_LABEL[q]}<input type="number" min={0} value={partNeed[q]} onChange={(e) => setPartNeed({ ...partNeed, [q]: Math.max(0, Number(e.target.value)) })} /></label>)}</div>
           <p className="muted">Tổng theo mức phải bằng tổng theo phần. Hệ thống rút không hoàn lại giữa các mã; thiếu câu sẽ báo rõ.</p>
           <button className="primary" onClick={() => void generateExam()}>Sinh mã đề</button>
+          <div className="filters">
+            <label>Tên đề<input value={examTitle} onChange={(e) => setExamTitle(e.target.value)} /></label>
+            <label>Thời gian (phút)<input type="number" min={1} value={duration} onChange={(e) => setDuration(Math.max(1, Number(e.target.value)))} /></label>
+            <label>Lớp giao bài<select value={selectedClassId} onChange={(e) => setSelectedClassId(e.target.value)}><option value="">Không gắn lớp</option>{classes.map((c) => <option key={c.id} value={c.id}>{c.name} — lớp {c.grade}</option>)}</select></label>
+            <button onClick={() => void saveGeneratedAsAssignment()}>Lưu đề & giao bài</button>
+            <button onClick={exportWord} disabled={!generated.length}>Xuất Word</button>
+          </div>
           {matrixMsg && <p className="notice">{matrixMsg}</p>}
         </main>
       )}
@@ -393,6 +727,97 @@ export default function App() {
               })}
             </section>
           ))}
+        </main>
+      )}
+
+      {tab === 'assign' && (
+        <main>
+          <section className="card no-print">
+            <h2>Lớp và học sinh</h2>
+            {!session && <p className="notice">Đăng nhập giáo viên ở phía trên để tạo lớp, giao bài và xem kết quả.</p>}
+            <div className="filters">
+              <label>Tên lớp<input value={className} onChange={(e) => setClassName(e.target.value)} placeholder="VD: 12A1" /></label>
+              <label>Khối<select value={classGrade} onChange={(e) => setClassGrade(Number(e.target.value))}><option>10</option><option>11</option><option>12</option></select></label>
+            </div>
+            <label className="field">Danh sách học sinh, mỗi dòng một tên<textarea value={studentNames} onChange={(e) => setStudentNames(e.target.value)} rows={5} /></label>
+            <button className="primary" onClick={() => void createClassAndStudents()}>Tạo lớp</button>
+            <div className="grid">
+              {classes.map((c) => <section className="card" key={c.id}><h3>{c.name}</h3><p className="meta">Khối {c.grade} · {students.filter((s) => s.class_id === c.id).length} học sinh</p>{students.filter((s) => s.class_id === c.id).slice(0, 8).map((s) => <p key={s.id}>{s.full_name}</p>)}</section>)}
+            </div>
+          </section>
+          <section className="card no-print">
+            <h2>Bài đã giao</h2>
+            <button onClick={() => void loadTeacherData()}>Tải lại</button>
+            {assignments.map((a) => {
+              const ex = exams.find((e) => e.id === a.exam_id);
+              return <article className="question" key={a.id}><p><strong>{a.title || ex?.title || 'Bài giao'}</strong> · Mã vào làm: <strong>{a.join_code}</strong> · {a.duration_minutes ?? ex?.duration_minutes ?? 45} phút</p><p className="meta">Đề #{a.exam_id} · {a.is_open ? 'Đang mở' : 'Đã đóng'} · {a.created_at ?? ''}</p><button onClick={() => { setJoinCode(a.join_code); setTab('take'); }}>Mở trang làm bài</button> <button onClick={() => { setResultAssignmentId(String(a.id)); setTab('results'); }}>Xem kết quả</button></article>;
+            })}
+          </section>
+        </main>
+      )}
+
+      {tab === 'take' && (
+        <main>
+          <section className="card no-print">
+            <h2>Học sinh làm bài</h2>
+            <div className="filters">
+              <label>Mã giao bài<input value={joinCode} onChange={(e) => setJoinCode(e.target.value.toUpperCase())} placeholder="VD: ABC234" /></label>
+              <label>Họ tên<input value={studentName} onChange={(e) => setStudentName(e.target.value)} /></label>
+              <label>Lớp<input value={takeClassName} onChange={(e) => setTakeClassName(e.target.value)} placeholder="VD: 12A1" /></label>
+              <button className="primary" onClick={() => void startTake()}>Vào làm bài</button>
+            </div>
+            {takeExam && <p className="notice">{takeExam.title} · Mã đề {takeCodeIndex + 1} · Thời gian {takeAssignment?.duration_minutes ?? takeExam.duration_minutes ?? 45} phút</p>}
+            {takeResult && <p className="notice">{takeResult}</p>}
+          </section>
+          {takeQuestions.map((q, i) => (
+            <article className="card" key={q.id}>
+              <p className="meta">Câu {i + 1} · {QTYPE_LABEL[q.qtype]} · {q.points} điểm</p>
+              <div className="content"><MathText text={q.content} /></div>
+              {q.image_url && <img className="figure" src={q.image_url} alt="Hình minh họa" />}
+              {q.qtype === 'single' && <div className="choices">{(q.options ?? []).map((op, oi) => <label className="check" key={oi}><input type="radio" name={`q-${q.id}`} checked={Number(answers[String(q.id)]) === oi} onChange={() => setAnswers({ ...answers, [String(q.id)]: oi })} /> <MathText text={op} /></label>)}</div>}
+              {q.qtype === 'tf' && <div className="filters">{['a', 'b', 'c', 'd'].map((k) => <label key={k}>Ý {k}<select value={String(((answers[String(q.id)] as Record<string, string> | undefined)?.[k]) ?? '')} onChange={(e) => setAnswers({ ...answers, [String(q.id)]: { ...((answers[String(q.id)] as Record<string, string> | undefined) ?? {}), [k]: e.target.value } })}><option value="">Chọn</option><option>Đúng</option><option>Sai</option></select></label>)}</div>}
+              {q.qtype === 'short' && <label className="field">Đáp án<input value={String(answers[String(q.id)] ?? '')} onChange={(e) => setAnswers({ ...answers, [String(q.id)]: e.target.value })} /></label>}
+              {q.qtype === 'essay' && <label className="field">Bài làm tự luận<textarea rows={6} value={String(answers[String(q.id)] ?? '')} onChange={(e) => setAnswers({ ...answers, [String(q.id)]: e.target.value })} /></label>}
+            </article>
+          ))}
+          {takeQuestions.length > 0 && <button className="primary no-print" onClick={() => void submitTake()}>Nộp bài</button>}
+        </main>
+      )}
+
+      {tab === 'results' && (
+        <main className="card no-print">
+          <h2>Kết quả và thống kê</h2>
+          {!session && <p className="notice">Đăng nhập giáo viên để xem kết quả.</p>}
+          <div className="filters">
+            <label>Bài giao<select value={resultAssignmentId} onChange={(e) => setResultAssignmentId(e.target.value)}>{assignments.map((a) => <option key={a.id} value={a.id}>{a.title || `Bài ${a.id}`} — {a.join_code}</option>)}</select></label>
+            <button onClick={() => void loadSubmissions()}>Tải kết quả</button>
+            <button onClick={exportResultsCsv} disabled={!submissions.length}>Xuất CSV</button>
+          </div>
+          {submissions.length > 0 && <p className="notice">Số bài nộp: {submissions.length} · Điểm trung bình: {(submissions.reduce((s, x) => s + Number(x.score ?? 0), 0) / submissions.length).toFixed(2)}</p>}
+          <div className="tablewrap"><table><thead><tr><th>Học sinh</th><th>Lớp</th><th>Mã đề</th><th>Điểm</th><th>Tự luận</th><th>Trạng thái</th><th>Chấm tự luận</th></tr></thead><tbody>{submissions.map((s) => <tr key={s.id}><td>{s.student_name}</td><td>{s.class_name ?? ''}</td><td>{s.code_index + 1}</td><td>{s.score ?? '—'}</td><td>{s.essay_score ?? '—'}</td><td>{s.status ?? ''}</td><td><input type="number" step="0.25" value={essayScores[String(s.id)] ?? ''} onChange={(e) => setEssayScores({ ...essayScores, [String(s.id)]: e.target.value })} /> <button onClick={() => void gradeEssay(s)}>Lưu</button></td></tr>)}</tbody></table></div>
+        </main>
+      )}
+
+      {tab === 'admin' && (
+        <main className="card no-print">
+          <h2>Quản trị câu hỏi</h2>
+          {!session && <p className="notice">Đăng nhập giáo viên để thêm/sửa/xóa câu hỏi.</p>}
+          <div className="filters">
+            <label>ID câu<input value={adminForm.id} onChange={(e) => setAdminForm({ ...adminForm, id: e.target.value })} placeholder="Để trống để thêm mới" /></label>
+            <button onClick={() => void loadAdminQuestion()}>Tải câu</button>
+            <label>Lớp<select value={adminForm.grade} onChange={(e) => setAdminForm({ ...adminForm, grade: Number(e.target.value) })}><option>10</option><option>11</option><option>12</option></select></label>
+            <label>Mức<select value={adminForm.level} onChange={(e) => setAdminForm({ ...adminForm, level: e.target.value })}>{LEVELS.map((l) => <option key={l}>{l}</option>)}</select></label>
+            <label>Loại<select value={adminForm.qtype} onChange={(e) => setAdminForm({ ...adminForm, qtype: e.target.value })}>{QTYPES.map((q) => <option key={q} value={q}>{QTYPE_LABEL[q]}</option>)}</select></label>
+            <label>Điểm<input type="number" step="0.25" value={adminForm.points} onChange={(e) => setAdminForm({ ...adminForm, points: Number(e.target.value) })} /></label>
+          </div>
+          <label className="field">Chương<input value={adminForm.chapter} onChange={(e) => setAdminForm({ ...adminForm, chapter: e.target.value })} /></label>
+          <label className="field">Dạng<input value={adminForm.dang} onChange={(e) => setAdminForm({ ...adminForm, dang: e.target.value })} /></label>
+          <label className="field">Nội dung<textarea rows={5} value={adminForm.content} onChange={(e) => setAdminForm({ ...adminForm, content: e.target.value })} /></label>
+          <label className="field">Phương án, mỗi dòng một phương án<textarea rows={5} value={adminForm.options} onChange={(e) => setAdminForm({ ...adminForm, options: e.target.value })} /></label>
+          <label className="field">Đáp án<input value={adminForm.correct} onChange={(e) => setAdminForm({ ...adminForm, correct: e.target.value })} /></label>
+          <label className="field">Lời giải<textarea rows={5} value={adminForm.explanation} onChange={(e) => setAdminForm({ ...adminForm, explanation: e.target.value })} /></label>
+          <div className="filters"><button className="primary" onClick={() => void saveAdminQuestion()}>Lưu câu hỏi</button><button onClick={() => void deleteAdminQuestion()}>Xóa câu</button></div>
+          {matrixMsg && <p className="notice">{matrixMsg}</p>}
         </main>
       )}
     </div>
