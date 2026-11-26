@@ -29,6 +29,11 @@ function stripOptionPrefix(s: string): string {
   return s.replace(/^\s*[A-D][.)]\s*/i, '').trim();
 }
 
+function fmtPoints(n: number): string {
+  const v = Math.round(Number(n || 0) * 1000) / 1000;
+  return String(v).replace('.', ',');
+}
+
 function gradeQuestion(q: Question, answer: unknown): { score: number; pending: boolean; note: string } {
   const points = Number(q.points || 0);
   if (q.qtype === 'essay') return { score: 0, pending: true, note: 'Tự luận chờ giáo viên chấm' };
@@ -197,6 +202,7 @@ export default function App() {
   const [numCodes, setNumCodes] = useState(4);
   const [levelNeed, setLevelNeed] = useState<Record<Level, number>>({ NB: 5, TH: 5, VD: 4, VDC: 2 });
   const [partNeed, setPartNeed] = useState<Record<QType, number>>({ single: 8, tf: 3, short: 3, essay: 2 });
+  const [partPoints, setPartPoints] = useState<Record<QType, number>>({ single: 3, tf: 3, short: 2, essay: 2 });
   const [generated, setGenerated] = useState<GeneratedCode[]>([]);
   const [matrixMsg, setMatrixMsg] = useState('');
   const [session, setSession] = useState<AuthSession | null>(() => getSession());
@@ -451,6 +457,11 @@ export default function App() {
         setMatrixMsg(`Tổng theo mức (${totalLevel}) phải bằng tổng theo phần (${totalPart}).`);
         return;
       }
+      const badPart = QTYPES.find((q) => partNeed[q] > 0 && !(partPoints[q] > 0));
+      if (badPart) {
+        setMatrixMsg(`Thầy đặt điểm cho ${QTYPE_LABEL[badPart]} lớn hơn 0 nhé.`);
+        return;
+      }
       const pool = await loadScopedPool();
       const buckets = {} as Record<Level, Record<QType, Question[]>>;
       for (const l of LEVELS) {
@@ -481,10 +492,13 @@ export default function App() {
         const qs: Question[] = [];
         for (const l of LEVELS) {
           for (const q of QTYPES) {
-            for (let i = 0; i < cells[l][q]; i++) qs.push(buckets[l][q].pop()!);
+            for (let i = 0; i < cells[l][q]; i++) {
+              const picked = buckets[l][q].pop()!;
+              qs.push({ ...picked, points: partNeed[q] > 0 ? partPoints[q] / partNeed[q] : 0 });
+            }
           }
         }
-        codes.push({ code: c, questions: qs, rawPoints: qs.reduce((s, x) => s + Number(x.points || 0), 0) });
+        codes.push({ code: c, questions: qs, rawPoints: QTYPES.reduce((s, q) => s + (partNeed[q] > 0 ? partPoints[q] : 0), 0) });
       }
       setGenerated(codes);
       setMatrixMsg(`Đã sinh ${codes.length} mã, mỗi mã ${totalLevel} câu, không trùng câu giữa các mã.`);
@@ -553,8 +567,8 @@ export default function App() {
         grade: mGrade,
         scope_chapter: scopeMode === 'chapter' ? mChapter : scopeMode === 'lesson' ? baseChapter(mLesson) : '',
         scope_lesson: scopeMode === 'lesson' ? mLesson : '',
-        matrix: { levelNeed, partNeed },
-        codes: generated.map((c) => ({ code: c.code, questionIds: c.questions.map((q) => q.id), rawPoints: c.rawPoints })),
+        matrix: { levelNeed, partNeed, partPoints },
+        codes: generated.map((c) => ({ code: c.code, questionIds: c.questions.map((q) => q.id), questionPoints: c.questions.map((q) => Number(q.points || 0)), rawPoints: c.rawPoints })),
         duration_minutes: duration,
       }, true);
       const exam = examRows[0];
@@ -602,7 +616,9 @@ export default function App() {
       const hash = [...nameKey].reduce((s, ch) => s + ch.charCodeAt(0), 0);
       const idx = exam.codes.length ? hash % exam.codes.length : 0;
       setTakeAssignment(assignment); setTakeExam(exam); setTakeCodeIndex(idx);
-      setTakeQuestions(await loadQuestionsByIds(exam.codes[idx]?.questionIds ?? []));
+      const loaded = await loadQuestionsByIds(exam.codes[idx]?.questionIds ?? []);
+      const savedPoints = exam.codes[idx]?.questionPoints ?? [];
+      setTakeQuestions(loaded.map((q, i) => ({ ...q, points: savedPoints[i] ?? q.points })));
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setLoading(false); }
   }
 
@@ -874,7 +890,9 @@ export default function App() {
           <div className="filters">{LEVELS.map((l) => <label key={l}>{l}<input type="number" min={0} value={levelNeed[l]} onChange={(e) => setLevelNeed({ ...levelNeed, [l]: Math.max(0, Number(e.target.value)) })} /></label>)}</div>
           <h3>Số câu theo phần</h3>
           <div className="filters">{QTYPES.map((q) => <label key={q}>{QTYPE_LABEL[q]}<input type="number" min={0} value={partNeed[q]} onChange={(e) => setPartNeed({ ...partNeed, [q]: Math.max(0, Number(e.target.value)) })} /></label>)}</div>
-          <p className="muted">Tổng theo mức phải bằng tổng theo phần. Hệ thống rút không hoàn lại giữa các mã; thiếu câu sẽ báo rõ.</p>
+          <h3>Điểm theo phần</h3>
+          <div className="filters">{QTYPES.map((q) => <label key={q}>{QTYPE_LABEL[q]}<input type="number" min={0} step="0.25" value={partPoints[q]} onChange={(e) => setPartPoints({ ...partPoints, [q]: Math.max(0, Number(e.target.value)) })} /><span className="muted">{partNeed[q] > 0 ? `${fmtPoints(partPoints[q] / partNeed[q])} đ/câu` : '—'}</span></label>)}</div>
+          <p className="muted">Tổng điểm đề: {fmtPoints(QTYPES.reduce((s, q) => s + (partNeed[q] > 0 ? partPoints[q] : 0), 0))} điểm. Điểm mỗi câu bằng điểm của phần chia cho số câu của phần đó. Tổng theo mức phải bằng tổng theo phần; thiếu câu sẽ báo rõ.</p>
           <button className="primary" onClick={() => void generateExam()}>Sinh mã đề</button>
           <div className="filters">
             <label>Tên đề<input value={examTitle} onChange={(e) => setExamTitle(e.target.value)} /></label>
@@ -897,7 +915,7 @@ export default function App() {
           {generated.map((code) => (
             <section className="exam" key={code.code}>
               <h2>Đề Toán lớp {mGrade} — Mã đề {String(code.code).padStart(2, '0')}</h2>
-              <p className="meta">Tổng điểm gốc: {code.rawPoints.toFixed(2)}; điểm quy đổi hiển thị theo thang 10.</p>
+              <p className="meta">Tổng điểm: {fmtPoints(code.rawPoints)} điểm.</p>
               {QTYPES.map((qt) => {
                 const qs = code.questions.filter((q) => q.qtype === qt);
                 if (!qs.length) return null;
@@ -960,7 +978,7 @@ export default function App() {
           </section>
           {takeQuestions.map((q, i) => (
             <article className="card" key={q.id}>
-              <p className="meta">Câu {i + 1} · {QTYPE_LABEL[q.qtype]} · {q.points} điểm</p>
+              <p className="meta">Câu {i + 1} · {QTYPE_LABEL[q.qtype]} · {fmtPoints(Number(q.points || 0))} điểm</p>
               <div className="content"><MathText text={q.content} /></div>
               {q.image_url && <img className="figure" src={q.image_url} alt="Hình minh họa" />}
               {q.qtype === 'single' && <div className="choices">{(q.options ?? []).map((op, oi) => <label className="check" key={oi}><input type="radio" name={`q-${q.id}`} checked={Number(answers[String(q.id)]) === oi} onChange={() => setAnswers({ ...answers, [String(q.id)]: oi })} /> <MathText text={op} /></label>)}</div>}

@@ -34,6 +34,7 @@ export interface TheoryNote {
 export interface ExamCodeRecord {
   code: number;
   questionIds: number[];
+  questionPoints?: number[];
   rawPoints: number;
 }
 
