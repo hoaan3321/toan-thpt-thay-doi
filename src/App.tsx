@@ -613,6 +613,8 @@ export default function App() {
 
   async function loadScopedPool(): Promise<Question[]> {
     const p = eqParams({ grade: mGrade });
+    if (scopeMode === 'lesson') p.set('lesson', `eq.${lessonTitle(mLesson)}`);
+    if (scopeMode === 'chapter') p.set('chapter', `like.${mChapter}*`);
     p.set('select', '*');
     p.set('order', 'id.asc');
     const all: Question[] = [];
