@@ -6,6 +6,8 @@ export const isSupabaseConfigured = Boolean(url && anonKey);
 export interface AuthSession {
   access_token: string;
   refresh_token?: string;
+  expires_at?: number;
+  expires_in?: number;
   user?: { id: string; email?: string };
 }
 
@@ -21,8 +23,34 @@ export function getSession(): AuthSession | null {
 }
 
 function saveSession(session: AuthSession | null) {
-  if (session) localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-  else localStorage.removeItem(SESSION_KEY);
+  if (session) {
+    const normalized = { ...session, expires_at: session.expires_at ?? (session.expires_in ? Math.floor(Date.now() / 1000) + session.expires_in : undefined) };
+    localStorage.setItem(SESSION_KEY, JSON.stringify(normalized));
+  } else localStorage.removeItem(SESSION_KEY);
+}
+
+export async function refreshSession(): Promise<AuthSession | null> {
+  const session = getSession();
+  if (!session?.refresh_token || !isSupabaseConfigured) return null;
+  const res = await fetch(`${url}/auth/v1/token?grant_type=refresh_token`, {
+    method: 'POST',
+    headers: { apikey: anonKey ?? '', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refresh_token: session.refresh_token }),
+  });
+  if (!res.ok) {
+    saveSession(null);
+    return null;
+  }
+  const next = (await res.json()) as AuthSession;
+  saveSession(next);
+  return next;
+}
+
+async function ensureFreshSession(): Promise<void> {
+  const session = getSession();
+  if (!session) return;
+  const now = Math.floor(Date.now() / 1000);
+  if (!session.expires_at || session.expires_at - now < 120) await refreshSession();
 }
 
 function headers(extra: Record<string, string> = {}, useAuth = false): HeadersInit {
@@ -39,10 +67,23 @@ async function parseError(res: Response): Promise<string> {
   return `Supabase ${res.status}: ${text}`;
 }
 
+async function authedFetch(input: string, init: RequestInit, useAuth: boolean): Promise<Response> {
+  if (useAuth) await ensureFreshSession();
+  let res = await fetch(input, init);
+  if (useAuth && res.status === 401) {
+    const refreshed = await refreshSession();
+    if (refreshed) {
+      const nextInit: RequestInit = { ...init, headers: { ...(init.headers as Record<string, string>), Authorization: `Bearer ${refreshed.access_token}` } };
+      res = await fetch(input, nextInit);
+    }
+  }
+  return res;
+}
+
 export async function supabaseGet<T>(path: string, params: URLSearchParams, useAuth = false): Promise<T> {
   if (!isSupabaseConfigured) throw new Error('Chưa cấu hình Supabase');
-  const res = await fetch(`${url}/rest/v1/${path}?${params.toString()}`, { headers: headers({}, useAuth) });
-  if (!res.ok) throw new Error(await parseError(res));
+  const res = await authedFetch(`${url}/rest/v1/${path}?${params.toString()}`, { headers: headers({}, useAuth) }, useAuth);
+  if (!res.ok) throw new Error(res.status === 401 ? 'Phiên đăng nhập đã hết hạn, thầy đăng nhập lại nhé.' : await parseError(res));
   return (await res.json()) as T;
 }
 
@@ -61,33 +102,33 @@ export async function supabaseCount(path: string, params: URLSearchParams): Prom
 
 export async function supabaseInsert<T>(path: string, body: unknown, useAuth = false): Promise<T> {
   if (!isSupabaseConfigured) throw new Error('Chưa cấu hình Supabase');
-  const res = await fetch(`${url}/rest/v1/${path}`, {
+  const res = await authedFetch(`${url}/rest/v1/${path}`, {
     method: 'POST',
     headers: headers({ 'Content-Type': 'application/json', Prefer: 'return=representation' }, useAuth),
     body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(await parseError(res));
+  }, useAuth);
+  if (!res.ok) throw new Error(res.status === 401 ? 'Phiên đăng nhập đã hết hạn, thầy đăng nhập lại nhé.' : await parseError(res));
   return (await res.json()) as T;
 }
 
 export async function supabaseUpdate<T>(path: string, params: URLSearchParams, body: unknown, useAuth = true): Promise<T> {
   if (!isSupabaseConfigured) throw new Error('Chưa cấu hình Supabase');
-  const res = await fetch(`${url}/rest/v1/${path}?${params.toString()}`, {
+  const res = await authedFetch(`${url}/rest/v1/${path}?${params.toString()}`, {
     method: 'PATCH',
     headers: headers({ 'Content-Type': 'application/json', Prefer: 'return=representation' }, useAuth),
     body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(await parseError(res));
+  }, useAuth);
+  if (!res.ok) throw new Error(res.status === 401 ? 'Phiên đăng nhập đã hết hạn, thầy đăng nhập lại nhé.' : await parseError(res));
   return (await res.json()) as T;
 }
 
 export async function supabaseDelete(path: string, params: URLSearchParams, useAuth = true): Promise<void> {
   if (!isSupabaseConfigured) throw new Error('Chưa cấu hình Supabase');
-  const res = await fetch(`${url}/rest/v1/${path}?${params.toString()}`, {
+  const res = await authedFetch(`${url}/rest/v1/${path}?${params.toString()}`, {
     method: 'DELETE',
     headers: headers({ Prefer: 'return=minimal' }, useAuth),
-  });
-  if (!res.ok) throw new Error(await parseError(res));
+  }, useAuth);
+  if (!res.ok) throw new Error(res.status === 401 ? 'Phiên đăng nhập đã hết hạn, thầy đăng nhập lại nhé.' : await parseError(res));
 }
 
 export async function signIn(email: string, password: string): Promise<AuthSession> {
