@@ -373,15 +373,15 @@ export default function App() {
     if (!isSupabaseConfigured) return;
     try {
       const counts = new Map<string, number>();
-      const scopeRows: { chapter: string; dang: string }[] = [];
+      const scopeRows: { chapter: string; lesson?: string; dang: string }[] = [];
       const limit = 1000;
       for (let offset = 0; ; offset += limit) {
         const p = eqParams({ grade: gradeValue });
-        p.set('select', 'chapter,dang');
+        p.set('select', 'chapter,lesson,dang');
         p.set('order', 'id.asc');
         p.set('limit', String(limit));
         p.set('offset', String(offset));
-        const rows = await supabaseGet<{ chapter: string; dang: string }[]>('questions', p);
+        const rows = await supabaseGet<{ chapter: string; lesson?: string; dang: string }[]>('questions', p);
         scopeRows.push(...rows);
         for (const r of rows) counts.set(r.chapter, (counts.get(r.chapter) ?? 0) + 1);
         if (rows.length < limit) break;
@@ -397,16 +397,14 @@ export default function App() {
           if (!lessonMap.has(key)) lessonMap.set(key, { name: display, base, count: 0 });
         }
       }
-      const candidatesByBase = new Map<string, string[]>();
-      for (const lesson of lessonMap.values()) {
-        const arr = candidatesByBase.get(lesson.base) ?? [];
-        arr.push(lesson.name);
-        candidatesByBase.set(lesson.base, arr);
-      }
       for (const r of scopeRows) {
-        const assigned = classifyLesson(r, candidatesByBase.get(baseChapter(r.chapter)) ?? []);
-        const lesson = assigned ? lessonMap.get(lessonKey(assigned)) : undefined;
-        if (lesson) lesson.count += 1;
+        const base = baseChapter(r.chapter);
+        const lessonName = (r.lesson ?? '').trim() || lessonTitle(r.chapter);
+        if (!lessonName) continue;
+        const display = `${base} — ${lessonName}`;
+        const key = lessonKey(display);
+        if (!lessonMap.has(key)) lessonMap.set(key, { name: display, base, count: 0 });
+        lessonMap.get(key)!.count += 1;
       }
       const lessons = [...lessonMap.values()];
       const chapters = [...chapterMap.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => a.name.localeCompare(b.name, 'vi'));
@@ -437,8 +435,8 @@ export default function App() {
     if (scopeMode === 'chapter') return all.filter((q) => baseChapter(q.chapter) === mChapter);
     if (scopeMode === 'lesson') {
       const base = baseChapter(mLesson);
-      const candidates = scopeLessons.filter((l) => l.base === base).map((l) => l.name);
-      return all.filter((q) => lessonMatches(q, mLesson, candidates.length ? candidates : [mLesson]));
+      const title = lessonTitle(mLesson);
+      return all.filter((q) => baseChapter(q.chapter) === base && ((q.lesson ?? '').trim() === title || lessonKey(q.chapter) === lessonKey(mLesson)));
     }
     return all;
   }
@@ -1027,7 +1025,7 @@ export default function App() {
 function QuestionCard({ q, showAnswers }: { q: Question; showAnswers: boolean }) {
   return (
     <article className="card">
-      <p className="meta">ID {q.id} · Lớp {q.grade} · {q.chapter} · {q.dang} · {q.level} · {QTYPE_LABEL[q.qtype]} · {q.points} điểm</p>
+      <p className="meta">ID {q.id} · Lớp {q.grade} · {q.chapter} · Bài: {q.lesson || '—'} · Dạng: {q.dang} · {q.level} · {QTYPE_LABEL[q.qtype]} · {q.points} điểm</p>
       <div className="content"><MathText text={q.content} /></div>
       {q.image_url && <img className="figure" src={q.image_url} alt="Hình minh họa" />}
       {q.options?.length > 0 && <ol className="options">{q.options.map((op, i) => <li key={i}><MathText text={op} /></li>)}</ol>}
