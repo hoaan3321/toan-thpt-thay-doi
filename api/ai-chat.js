@@ -3,9 +3,12 @@ const rate = new Map();
 function providers() {
   const list = [];
   if (process.env.GROQ_API_KEY) list.push('groq');
+  if (process.env.CEREBRAS_API_KEY) list.push('cerebras');
+  if (process.env.OPENROUTER_API_KEY) list.push('openrouter');
+  if (process.env.SAMBANOVA_API_KEY) list.push('sambanova');
+  if (process.env.CLOUDFLARE_ACCOUNT_ID && process.env.CLOUDFLARE_API_TOKEN) list.push('cloudflare');
   if (process.env.GEMINI_API_KEY) list.push('gemini');
   if (process.env.OPENAI_API_KEY) list.push('openai');
-  if (process.env.OPENROUTER_API_KEY) list.push('openrouter');
   return list;
 }
 
@@ -97,16 +100,22 @@ export default async function handler(req, res) {
           messages,
           context,
         });
+      } else if (p === 'cerebras') {
+        text = await callOpenAICompatible({ url: 'https://api.cerebras.ai/v1/chat/completions', key: process.env.CEREBRAS_API_KEY, model: process.env.CEREBRAS_MODEL || 'gpt-oss-120b', messages, context });
+      } else if (p === 'sambanova') {
+        text = await callOpenAICompatible({ url: 'https://api.sambanova.ai/v1/chat/completions', key: process.env.SAMBANOVA_API_KEY, model: process.env.SAMBANOVA_MODEL || 'gemma-4-31B-it', messages, context });
+      } else if (p === 'cloudflare') {
+        text = await callOpenAICompatible({ url: `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/ai/v1/chat/completions`, key: process.env.CLOUDFLARE_API_TOKEN, model: process.env.CLOUDFLARE_MODEL || '@cf/google/gemma-4-26b-a4b-it', messages, context });
       } else if (p === 'gemini') {
-        const models = [...new Set([process.env.GEMINI_MODEL, 'gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-3.8-flash', 'gemini-flash-lite-latest', 'gemini-2.5-flash'].filter(Boolean))];
-        let lastError = null;
+        const models = [...new Set([process.env.GEMINI_MODEL, 'gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-3.8-flash', 'gemini-flash-lite-latest'].filter(Boolean))];
+        const modelErrors = [];
         for (const model of models) {
           try {
             text = await callGemini({ key: process.env.GEMINI_API_KEY, model, messages, context });
             if (text.trim()) break;
-          } catch (e) { lastError = e; }
+          } catch (e) { modelErrors.push(`${model}: ${e instanceof Error ? e.message : String(e)}`); }
         }
-        if (!text.trim() && lastError) throw lastError;
+        if (!text.trim() && modelErrors.length) throw new Error(modelErrors.join('; '));
       } else if (p === 'openai') {
         text = await callOpenAICompatible({
           url: 'https://api.openai.com/v1/chat/completions',
@@ -119,7 +128,7 @@ export default async function handler(req, res) {
         text = await callOpenAICompatible({
           url: 'https://openrouter.ai/api/v1/chat/completions',
           key: process.env.OPENROUTER_API_KEY,
-          model: process.env.OPENROUTER_MODEL || 'openai/gpt-4o-mini',
+          model: process.env.OPENROUTER_MODEL || 'openrouter/free',
           messages,
           context,
         });
