@@ -5,6 +5,7 @@ export interface Question {
   id: number;
   grade: number;
   chapter: string;
+  lesson?: string;
   dang: string;
   level: Level;
   qtype: QType;
