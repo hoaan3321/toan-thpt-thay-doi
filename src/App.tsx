@@ -72,6 +72,63 @@ function downloadText(filename: string, text: string, type = 'text/plain;charset
   URL.revokeObjectURL(a.href);
 }
 
+function downloadBlob(filename: string, blob: Blob) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function latexToText(input: string): string {
+  let s = String(input ?? '');
+  s = s.replace(/\$\$([\s\S]*?)\$\$/g, '$1').replace(/\$([^$]*)\$/g, '$1').replace(/\\\(([\s\S]*?)\\\)/g, '$1').replace(/\\\[([\s\S]*?)\\\]/g, '$1');
+  s = s.replace(/\\dfrac\{([^{}]+)\}\{([^{}]+)\}/g, '($1)/($2)').replace(/\\frac\{([^{}]+)\}\{([^{}]+)\}/g, '($1)/($2)');
+  s = s.replace(/\\sqrt\{([^{}]+)\}/g, '√($1)').replace(/\\sqrt\s*([0-9a-zA-Z])/g, '√$1');
+  const symbols: Record<string, string> = { '\\pi': 'π', '\\infty': '∞', '\\alpha': 'α', '\\beta': 'β', '\\gamma': 'γ', '\\Delta': 'Δ', '\\delta': 'δ', '\\theta': 'θ', '\\lambda': 'λ', '\\mu': 'μ', '\\sigma': 'σ', '\\phi': 'φ', '\\omega': 'ω', '\\le': '≤', '\\ge': '≥', '\\ne': '≠', '\\neq': '≠', '\\approx': '≈', '\\times': '×', '\\cdot': '·', '\\pm': '±', '\\in': '∈', '\\notin': '∉', '\\subset': '⊂', '\\cup': '∪', '\\cap': '∩', '\\rightarrow': '→', '\\Rightarrow': '⇒', '\\Leftrightarrow': '⇔', '\\angle': '∠', '\\perp': '⊥', '\\parallel': '∥', '\\triangle': '△', '\\emptyset': '∅', '\\mathbb{R}': 'ℝ', '\\mathbb{Z}': 'ℤ', '\\mathbb{N}': 'ℕ', '\\mathbb{Q}': 'ℚ' };
+  for (const [k, v] of Object.entries(symbols)) s = s.split(k).join(v);
+  s = s.replace(/\\text\{([^{}]*)\}/g, '$1').replace(/\\mathrm\{([^{}]*)\}/g, '$1').replace(/\\left|\\right/g, '').replace(/\\,/g, ' ').replace(/\\;/g, ' ').replace(/\\ /g, ' ');
+  s = s.replace(/\^\{([^{}]+)\}/g, '^$1').replace(/_\{([^{}]+)\}/g, '_$1').replace(/\\[a-zA-Z]+/g, '');
+  return s.replace(/\s+/g, ' ').trim();
+}
+
+function xmlEscape(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+const CRC_TABLE = (() => {
+  const table = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; table[n] = c >>> 0; }
+  return table;
+})();
+
+function crc32(bytes: Uint8Array): number {
+  let crc = 0xffffffff;
+  for (const b of bytes) crc = CRC_TABLE[(crc ^ b) & 0xff] ^ (crc >>> 8);
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function zipStore(files: { name: string; data: Uint8Array }[]): Blob {
+  const enc = new TextEncoder();
+  const chunks: Uint8Array[] = [];
+  const central: Uint8Array[] = [];
+  let offset = 0;
+  const u16 = (v: number) => new Uint8Array([v & 255, (v >>> 8) & 255]);
+  const u32 = (v: number) => new Uint8Array([v & 255, (v >>> 8) & 255, (v >>> 16) & 255, (v >>> 24) & 255]);
+  const join = (parts: Uint8Array[]) => { const out = new Uint8Array(parts.reduce((s, p) => s + p.length, 0)); let o = 0; for (const p of parts) { out.set(p, o); o += p.length; } return out; };
+  for (const f of files) {
+    const name = enc.encode(f.name);
+    const crc = crc32(f.data);
+    const local = join([u32(0x04034b50), u16(20), u16(0x0800), u16(0), u16(0), u16(0), u32(crc), u32(f.data.length), u32(f.data.length), u16(name.length), u16(0), name, f.data]);
+    chunks.push(local);
+    central.push(join([u32(0x02014b50), u16(20), u16(20), u16(0x0800), u16(0), u16(0), u16(0), u32(crc), u32(f.data.length), u32(f.data.length), u16(name.length), u16(0), u16(0), u16(0), u16(0), u32(0), u32(offset), name]));
+    offset += local.length;
+  }
+  const centralBytes = join(central);
+  const end = join([u32(0x06054b50), u16(0), u16(0), u16(files.length), u16(files.length), u32(centralBytes.length), u32(offset), u16(0)]);
+  return new Blob([join([...chunks, centralBytes, end]) as BlobPart], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+}
+
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -689,12 +746,88 @@ export default function App() {
     downloadText('ket-qua.csv', rows.map((r) => r.map((x) => `"${String(x).replace(/"/g, '""')}"`).join(',')).join('\n'), 'text/csv;charset=utf-8');
   }
 
-  function exportWord() {
-    const html = generated.map((code) => `<h2>Đề Toán lớp ${mGrade} — Mã đề ${String(code.code).padStart(2, '0')}</h2>` + QTYPES.map((qt) => {
-      const qs = code.questions.filter((q) => q.qtype === qt);
-      return qs.length ? `<h3>${QTYPE_LABEL[qt]}</h3>` + qs.map((q, i) => `<p><b>Câu ${i + 1}.</b> ${q.content}</p>${q.options?.length ? `<ol>${q.options.map((op) => `<li>${op}</li>`).join('')}</ol>` : ''}${showAnswers ? `<p><b>Đáp án:</b> ${q.correct}</p><p>${q.explanation}</p>` : ''}`).join('') : '';
-    }).join('')).join('<hr/>');
-    downloadText('de-toan.doc', `<html><head><meta charset="utf-8"></head><body>${html}</body></html>`, 'application/msword;charset=utf-8');
+  function partPointsOf(qs: Question[]): number {
+    return qs.reduce((s, q) => s + Number(q.points || 0), 0);
+  }
+
+  function exportDocx() {
+    const enc = new TextEncoder();
+    const run = (text: string, bold = false, size = 24) => `<w:r><w:rPr>${bold ? '<w:b/>' : ''}<w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"/><w:sz w:val="${size}"/></w:rPr><w:t xml:space="preserve">${xmlEscape(text)}</w:t></w:r>`;
+    const para = (text: string, opts: { bold?: boolean; size?: number; align?: string; indent?: number; before?: number; after?: number } = {}) => `<w:p><w:pPr>${opts.align ? `<w:jc w:val="${opts.align}"/>` : ''}${opts.indent ? `<w:ind w:left="${opts.indent}"/>` : ''}<w:spacing w:before="${opts.before ?? 0}" w:after="${opts.after ?? 60}" w:line="312" w:lineRule="auto"/></w:pPr>${run(text, opts.bold, opts.size ?? 24)}</w:p>`;
+    const body: string[] = [];
+    generated.forEach((code, ci) => {
+      if (ci > 0) body.push('<w:p><w:r><w:br w:type="page"/></w:r></w:p>');
+      body.push(para(`ĐỀ TOÁN LỚP ${mGrade} — MÃ ĐỀ ${String(code.code).padStart(2, '0')}`, { bold: true, size: 28, align: 'center', after: 40 }));
+      body.push(para(`Thời gian: ${duration} phút · Tổng điểm: ${fmtPoints(code.rawPoints)} điểm`, { align: 'center', after: 120 }));
+      for (const qt of QTYPES) {
+        const qs = code.questions.filter((q) => q.qtype === qt);
+        if (!qs.length) continue;
+        body.push(para(`${QTYPE_LABEL[qt]} (${fmtPoints(partPointsOf(qs))} điểm)`, { bold: true, before: 120, after: 80 }));
+        qs.forEach((q, i) => {
+          body.push(para(`Câu ${i + 1}. ${latexToText(q.content)}`, { after: 40 }));
+          (q.options ?? []).forEach((op, oi) => body.push(para(`${'ABCD'[oi] ?? oi + 1}. ${latexToText(op)}`, { indent: 360, after: 20 })));
+          if (showAnswers) {
+            body.push(para(`Đáp án: ${latexToText(q.correct)}`, { bold: true, indent: 360, after: 20 }));
+            if (q.explanation) body.push(para(latexToText(q.explanation), { indent: 360, after: 80 }));
+          }
+        });
+      }
+    });
+    const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${body.join('')}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134"/></w:sectPr></w:body></w:document>`;
+    const stylesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"/><w:sz w:val="24"/></w:rPr></w:style></w:styles>`;
+    const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>`;
+    const rels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`;
+    const docRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`;
+    downloadBlob('de-toan.docx', zipStore([
+      { name: '[Content_Types].xml', data: enc.encode(contentTypes) },
+      { name: '_rels/.rels', data: enc.encode(rels) },
+      { name: 'word/document.xml', data: enc.encode(documentXml) },
+      { name: 'word/styles.xml', data: enc.encode(stylesXml) },
+      { name: 'word/_rels/document.xml.rels', data: enc.encode(docRels) },
+    ]));
+  }
+
+  function exportLatex() {
+    const lines: string[] = [
+      '% Biên dịch bằng XeLaTeX hoặc LuaLaTeX',
+      '\\documentclass[12pt,a4paper]{article}',
+      '\\usepackage[margin=2cm]{geometry}',
+      '\\usepackage{fontspec}',
+      '\\setmainfont{Times New Roman}',
+      '\\usepackage{amsmath,amssymb}',
+      '\\usepackage{enumitem}',
+      '\\setlength{\\parskip}{4pt}',
+      '\\setlength{\\parindent}{0pt}',
+      '\\begin{document}',
+    ];
+    generated.forEach((code, ci) => {
+      if (ci > 0) lines.push('\\newpage');
+      lines.push(`\\begin{center}\\textbf{\\large ĐỀ TOÁN LỚP ${mGrade} --- MÃ ĐỀ ${String(code.code).padStart(2, '0')}}\\\\[2pt] Thời gian: ${duration} phút \\quad Tổng điểm: ${fmtPoints(code.rawPoints)} điểm\\end{center}`);
+      for (const qt of QTYPES) {
+        const qs = code.questions.filter((q) => q.qtype === qt);
+        if (!qs.length) continue;
+        lines.push(`\\textbf{${QTYPE_LABEL[qt]} (${fmtPoints(partPointsOf(qs))} điểm)}`);
+        qs.forEach((q, i) => {
+          lines.push(`\\textbf{Câu ${i + 1}.} ${q.content}`);
+          if (q.options?.length) {
+            lines.push('\\begin{enumerate}[label=\\Alph*.,leftmargin=*]');
+            q.options.forEach((op) => lines.push(`\\item ${op}`));
+            lines.push('\\end{enumerate}');
+          }
+          if (showAnswers) {
+            lines.push(`\\textbf{Đáp án:} ${q.correct}`);
+            if (q.explanation) lines.push(q.explanation);
+          }
+        });
+      }
+    });
+    lines.push('\\end{document}');
+    downloadText('de-toan.tex', lines.join('\n'), 'text/x-tex;charset=utf-8');
+  }
+
+  function exportPdf() {
+    setTab('print');
+    window.setTimeout(() => window.print(), 350);
   }
 
   async function loadAdminQuestion() {
@@ -899,7 +1032,9 @@ export default function App() {
             <label>Thời gian (phút)<input type="number" min={1} value={duration} onChange={(e) => setDuration(Math.max(1, Number(e.target.value)))} /></label>
             <label>Lớp giao bài<select value={selectedClassId} onChange={(e) => setSelectedClassId(e.target.value)}><option value="">Không gắn lớp</option>{classes.map((c) => <option key={c.id} value={c.id}>{c.name} — lớp {c.grade}</option>)}</select></label>
             <button onClick={() => void saveGeneratedAsAssignment()}>Lưu đề & giao bài</button>
-            <button onClick={exportWord} disabled={!generated.length}>Xuất Word</button>
+            <button onClick={exportDocx} disabled={!generated.length}>Xuất DOCX</button>
+            <button onClick={exportPdf} disabled={!generated.length}>Xuất PDF</button>
+            <button onClick={exportLatex} disabled={!generated.length}>Xuất LaTeX</button>
           </div>
           {matrixMsg && <p className="notice">{matrixMsg}</p>}
         </main>
@@ -908,7 +1043,9 @@ export default function App() {
       {tab === 'print' && (
         <main>
           <div className="no-print filters">
-            <button className="primary" onClick={() => window.print()}>In đề</button>
+            <button className="primary" onClick={() => window.print()}>In đề / Xuất PDF</button>
+            <button onClick={exportDocx} disabled={!generated.length}>Xuất DOCX</button>
+            <button onClick={exportLatex} disabled={!generated.length}>Xuất LaTeX</button>
             <label className="check"><input type="checkbox" checked={showAnswers} onChange={(e) => setShowAnswers(e.target.checked)} /> In kèm đáp án/lời giải</label>
           </div>
           {generated.length === 0 && <p className="muted">Chưa có mã đề. Hãy vào mục Tạo đề để sinh mã.</p>}
