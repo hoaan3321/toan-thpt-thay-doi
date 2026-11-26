@@ -189,8 +189,11 @@ export default function App() {
   const [theory, setTheory] = useState<TheoryNote[]>([]);
 
   const [mGrade, setMGrade] = useState(12);
+  const [scopeMode, setScopeMode] = useState<'all' | 'chapter' | 'lesson'>('all');
   const [mChapter, setMChapter] = useState('');
   const [mLesson, setMLesson] = useState('');
+  const [scopeChapters, setScopeChapters] = useState<{ name: string; count: number }[]>([]);
+  const [scopeLessons, setScopeLessons] = useState<{ name: string; base: string; count: number }[]>([]);
   const [numCodes, setNumCodes] = useState(4);
   const [levelNeed, setLevelNeed] = useState<Record<Level, number>>({ NB: 5, TH: 5, VD: 4, VDC: 2 });
   const [partNeed, setPartNeed] = useState<Record<QType, number>>({ single: 8, tf: 3, short: 3, essay: 2 });
@@ -284,10 +287,45 @@ export default function App() {
     } finally { setLoading(false); }
   }
 
+  function baseChapter(chapter: string): string {
+    return chapter.split(' — ')[0].trim();
+  }
+
+  async function loadScopes(gradeValue = mGrade) {
+    if (!isSupabaseConfigured) return;
+    try {
+      const counts = new Map<string, number>();
+      const limit = 1000;
+      for (let offset = 0; ; offset += limit) {
+        const p = eqParams({ grade: gradeValue });
+        p.set('select', 'chapter');
+        p.set('order', 'id.asc');
+        p.set('limit', String(limit));
+        p.set('offset', String(offset));
+        const rows = await supabaseGet<{ chapter: string }[]>('questions', p);
+        for (const r of rows) counts.set(r.chapter, (counts.get(r.chapter) ?? 0) + 1);
+        if (rows.length < limit) break;
+      }
+      const chapterMap = new Map<string, number>();
+      const lessons: { name: string; base: string; count: number }[] = [];
+      for (const [name, count] of counts.entries()) {
+        const base = baseChapter(name);
+        chapterMap.set(base, (chapterMap.get(base) ?? 0) + count);
+        if (name.includes(' — ')) lessons.push({ name, base, count });
+      }
+      const chapters = [...chapterMap.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+      lessons.sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+      setScopeChapters(chapters);
+      setScopeLessons(lessons);
+      if (!mChapter && chapters[0]) setMChapter(chapters[0].name);
+      if (!mLesson && lessons[0]) setMLesson(lessons[0].name);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   async function loadScopedPool(): Promise<Question[]> {
     const p = eqParams({ grade: mGrade });
-    if (mChapter.trim()) p.set('chapter', ilike(mChapter.trim()));
-    if (mLesson.trim()) p.set('chapter', ilike(mLesson.trim()));
     p.set('select', '*');
     p.set('order', 'id.asc');
     const all: Question[] = [];
@@ -300,6 +338,8 @@ export default function App() {
       all.push(...rows);
       if (rows.length < limit) break;
     }
+    if (scopeMode === 'chapter') return all.filter((q) => baseChapter(q.chapter) === mChapter);
+    if (scopeMode === 'lesson') return all.filter((q) => q.chapter === mLesson);
     return all;
   }
 
@@ -413,8 +453,8 @@ export default function App() {
       const examRows = await supabaseInsert<ExamRecord[]>('exams', {
         title: examTitle.trim() || `Đề Toán lớp ${mGrade}`,
         grade: mGrade,
-        scope_chapter: mChapter.trim(),
-        scope_lesson: mLesson.trim(),
+        scope_chapter: scopeMode === 'chapter' ? mChapter : scopeMode === 'lesson' ? baseChapter(mLesson) : '',
+        scope_lesson: scopeMode === 'lesson' ? mLesson : '',
         matrix: { levelNeed, partNeed },
         codes: generated.map((c) => ({ code: c.code, questionIds: c.questions.map((q) => q.id), rawPoints: c.rawPoints })),
         duration_minutes: duration,
@@ -592,6 +632,7 @@ export default function App() {
   useEffect(() => { if (tab === 'theory') void loadTheory(); }, [tab, theoryGrade]);
   useEffect(() => { if (session) void loadTeacherData(); }, [session]);
   useEffect(() => { if (tab === 'results' && session) void loadSubmissions(); }, [tab, session]);
+  useEffect(() => { if (tab === 'matrix') void loadScopes(); }, [tab, mGrade]);
 
   return (
     <div className="app">
@@ -676,9 +717,10 @@ export default function App() {
         <main className="card no-print">
           <h2>Tạo đề theo ma trận</h2>
           <div className="filters">
-            <label>Lớp<select value={mGrade} onChange={(e) => setMGrade(Number(e.target.value))}><option>10</option><option>11</option><option>12</option></select></label>
-            <label>Phạm vi chương<input value={mChapter} onChange={(e) => setMChapter(e.target.value)} placeholder="Để trống = toàn khối" /></label>
-            <label>Phạm vi bài<input value={mLesson} onChange={(e) => setMLesson(e.target.value)} placeholder="Tên bài/§ trong chương" /></label>
+            <label>Lớp<select value={mGrade} onChange={(e) => { setMGrade(Number(e.target.value)); setMChapter(''); setMLesson(''); }}><option>10</option><option>11</option><option>12</option></select></label>
+            <label>Phạm vi<select value={scopeMode} onChange={(e) => setScopeMode(e.target.value as 'all' | 'chapter' | 'lesson')}><option value="all">Toàn khối</option><option value="chapter">Theo chương</option><option value="lesson">Theo bài</option></select></label>
+            {scopeMode === 'chapter' && <label>Chương<select value={mChapter} onChange={(e) => setMChapter(e.target.value)}>{scopeChapters.map((c) => <option key={c.name} value={c.name}>{c.name} ({c.count} câu)</option>)}</select></label>}
+            {scopeMode === 'lesson' && <label>Bài<select value={mLesson} onChange={(e) => setMLesson(e.target.value)}>{scopeLessons.map((l) => <option key={l.name} value={l.name}>{l.name} ({l.count} câu)</option>)}</select></label>}
             <label>Số mã đề<input type="number" min={1} max={50} value={numCodes} onChange={(e) => setNumCodes(Math.max(1, Math.min(50, Number(e.target.value))))} /></label>
           </div>
           <h3>Số câu theo mức</h3>
