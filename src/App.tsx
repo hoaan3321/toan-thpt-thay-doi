@@ -298,28 +298,70 @@ export default function App() {
     return chapter.split(' — ')[0].trim();
   }
 
+  function normalizeText(s: string): string {
+    return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/[^a-z0-9]+/g, ' ').trim();
+  }
+
+  function lessonTitle(chapter: string): string {
+    const part = chapter.split(' — ')[1] ?? '';
+    return part.replace(/^§\d+\.\s*/, '').trim();
+  }
+
+  function lessonKey(chapter: string): string {
+    return `${baseChapter(chapter)}|${normalizeText(lessonTitle(chapter))}`;
+  }
+
+  function lessonMatches(q: { chapter: string; dang?: string; content?: string }, selectedLesson: string): boolean {
+    if (!selectedLesson) return false;
+    if (lessonKey(q.chapter) === lessonKey(selectedLesson)) return true;
+    if (baseChapter(q.chapter) !== baseChapter(selectedLesson)) return false;
+    const title = normalizeText(lessonTitle(selectedLesson));
+    const text = normalizeText(`${q.dang ?? ''} ${q.content ?? ''}`);
+    if (!title || !text) return false;
+    if (text.includes(title)) return true;
+    const tokens = title.split(' ').filter((t) => t.length >= 3);
+    const bigrams = tokens.slice(0, -1).map((t, i) => `${t} ${tokens[i + 1]}`);
+    if (bigrams.some((b) => text.includes(b))) return true;
+    if (title.includes('toa do') && text.includes('toa do')) return true;
+    if (title.includes('tich vo huong') && text.includes('tich vo huong')) return true;
+    if (title.includes('tong va hieu') && (text.includes('tong') || text.includes('hieu'))) return true;
+    if (title.includes('tich cua mot vecto voi mot so') && (text.includes('tich cua mot vecto') || text.includes('cung phuong') || text.includes('he so k'))) return true;
+    if (title.includes('khai niem mo dau') && (text.includes('phuong huong') || text.includes('do dai') || text.includes('bang nhau') || text.includes('vectơ doi') || text.includes('vecto doi'))) return true;
+    return false;
+  }
+
   async function loadScopes(gradeValue = mGrade) {
     if (!isSupabaseConfigured) return;
     try {
       const counts = new Map<string, number>();
+      const scopeRows: { chapter: string; dang: string }[] = [];
       const limit = 1000;
       for (let offset = 0; ; offset += limit) {
         const p = eqParams({ grade: gradeValue });
-        p.set('select', 'chapter');
+        p.set('select', 'chapter,dang');
         p.set('order', 'id.asc');
         p.set('limit', String(limit));
         p.set('offset', String(offset));
-        const rows = await supabaseGet<{ chapter: string }[]>('questions', p);
+        const rows = await supabaseGet<{ chapter: string; dang: string }[]>('questions', p);
+        scopeRows.push(...rows);
         for (const r of rows) counts.set(r.chapter, (counts.get(r.chapter) ?? 0) + 1);
         if (rows.length < limit) break;
       }
       const chapterMap = new Map<string, number>();
-      const lessons: { name: string; base: string; count: number }[] = [];
+      const lessonMap = new Map<string, { name: string; base: string; count: number }>();
       for (const [name, count] of counts.entries()) {
         const base = baseChapter(name);
         chapterMap.set(base, (chapterMap.get(base) ?? 0) + count);
-        if (name.includes(' — ')) lessons.push({ name, base, count });
+        if (name.includes(' — ')) {
+          const key = lessonKey(name);
+          const display = `${base} — ${lessonTitle(name)}`;
+          if (!lessonMap.has(key)) lessonMap.set(key, { name: display, base, count: 0 });
+        }
       }
+      for (const lesson of lessonMap.values()) {
+        lesson.count = scopeRows.filter((r) => lessonMatches(r, lesson.name)).length;
+      }
+      const lessons = [...lessonMap.values()];
       const chapters = [...chapterMap.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => a.name.localeCompare(b.name, 'vi'));
       lessons.sort((a, b) => a.name.localeCompare(b.name, 'vi'));
       setScopeChapters(chapters);
@@ -346,7 +388,7 @@ export default function App() {
       if (rows.length < limit) break;
     }
     if (scopeMode === 'chapter') return all.filter((q) => baseChapter(q.chapter) === mChapter);
-    if (scopeMode === 'lesson') return all.filter((q) => q.chapter === mLesson);
+    if (scopeMode === 'lesson') return all.filter((q) => lessonMatches(q, mLesson));
     return all;
   }
 
