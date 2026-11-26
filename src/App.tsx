@@ -225,6 +225,11 @@ export default function App() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [essayScores, setEssayScores] = useState<Record<string, string>>({});
   const [adminForm, setAdminForm] = useState({ id: '', grade: 12, chapter: '', dang: '', level: 'NB', qtype: 'single', content: '', options: '', correct: '', explanation: '', points: 0.25 });
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiInput, setAiInput] = useState('');
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiStatus, setAiStatus] = useState('Đang kiểm tra AI…');
+  const [aiMessages, setAiMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([{ role: 'assistant', content: 'Thầy hỏi em về bài toán, cách tạo đề hoặc câu đang xem nhé.' }]);
 
   const bankParams = useMemo(() => {
     const p = eqParams({ grade, level: level || undefined, qtype: qtype || undefined });
@@ -633,6 +638,34 @@ export default function App() {
   useEffect(() => { if (session) void loadTeacherData(); }, [session]);
   useEffect(() => { if (tab === 'results' && session) void loadSubmissions(); }, [tab, session]);
   useEffect(() => { if (tab === 'matrix') void loadScopes(); }, [tab, mGrade]);
+  useEffect(() => {
+    fetch('/api/ai-chat').then((r) => r.json()).then((d) => setAiStatus(d.enabled ? `AI đã bật: ${(d.providers || []).join(', ')}` : 'AI chưa bật: đặt GROQ_API_KEY hoặc GEMINI_API_KEY trong Vercel')).catch(() => setAiStatus('AI chưa bật'));
+  }, []);
+
+  function aiContext(): string {
+    const parts = [`Mục đang mở: ${tab}`, `Lớp tạo đề: ${mGrade}`, `Phạm vi: ${scopeMode === 'chapter' ? mChapter : scopeMode === 'lesson' ? mLesson : 'Toàn khối'}`];
+    if (questions[0]) parts.push(`Câu đầu danh sách đang xem #${questions[0].id}: ${questions[0].content}\nĐáp án: ${questions[0].correct}\nLời giải: ${questions[0].explanation}`);
+    if (generated[0]) parts.push(`Đề đã sinh: ${generated.length} mã, mã 1 có ${generated[0].questions.length} câu.`);
+    return parts.join('\n');
+  }
+
+  async function sendAi() {
+    const text = aiInput.trim();
+    if (!text || aiBusy) return;
+    const next = [...aiMessages, { role: 'user' as const, content: text }];
+    setAiMessages(next);
+    setAiInput('');
+    setAiBusy(true);
+    try {
+      const res = await fetch('/api/ai-chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages: next, context: aiContext() }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `AI HTTP ${res.status}`);
+      setAiMessages([...next, { role: 'assistant', content: data.text || 'AI chưa trả lời được.' }]);
+      if (data.provider) setAiStatus(`AI đã bật: ${data.provider}`);
+    } catch (e) {
+      setAiMessages([...next, { role: 'assistant', content: e instanceof Error ? e.message : String(e) }]);
+    } finally { setAiBusy(false); }
+  }
 
   return (
     <div className="app">
@@ -861,6 +894,15 @@ export default function App() {
           <div className="filters"><button className="primary" onClick={() => void saveAdminQuestion()}>Lưu câu hỏi</button><button onClick={() => void deleteAdminQuestion()}>Xóa câu</button></div>
           {matrixMsg && <p className="notice">{matrixMsg}</p>}
         </main>
+      )}
+
+      <button className="ai-bubble no-print" onClick={() => setAiOpen(!aiOpen)} aria-label="Mở chat AI">💬</button>
+      {aiOpen && (
+        <section className="ai-panel no-print">
+          <div className="ai-head"><strong>Chat AI Toán</strong><span>{aiStatus}</span><button onClick={() => setAiOpen(false)}>×</button></div>
+          <div className="ai-messages">{aiMessages.map((m, i) => <div key={i} className={`ai-msg ${m.role}`}><MathText text={m.content} /></div>)}{aiBusy && <div className="ai-msg assistant">AI đang trả lời…</div>}</div>
+          <div className="ai-input"><textarea rows={2} value={aiInput} onChange={(e) => setAiInput(e.target.value)} placeholder="Hỏi AI về bài toán, đề thi, cách giải…" onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void sendAi(); } }} /><button className="primary" onClick={() => void sendAi()} disabled={aiBusy}>Gửi</button></div>
+        </section>
       )}
     </div>
   );
