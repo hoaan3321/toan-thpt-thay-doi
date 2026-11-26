@@ -92,6 +92,136 @@ function latexToText(input: string): string {
   return s.replace(/\s+/g, ' ').trim();
 }
 
+const MATH_SYMBOLS: Record<string, string> = {
+  pi: 'π', infty: '∞', alpha: 'α', beta: 'β', gamma: 'γ', delta: 'δ', Delta: 'Δ', theta: 'θ', lambda: 'λ', mu: 'μ', sigma: 'σ', phi: 'φ', varphi: 'φ', omega: 'ω', Omega: 'Ω', epsilon: 'ε', varepsilon: 'ε', rho: 'ρ', tau: 'τ', xi: 'ξ', eta: 'η', kappa: 'κ', nu: 'ν', psi: 'ψ', chi: 'χ', zeta: 'ζ',
+  le: '≤', leq: '≤', ge: '≥', geq: '≥', ne: '≠', neq: '≠', approx: '≈', times: '×', cdot: '·', pm: '±', mp: '∓', div: '÷', in: '∈', notin: '∉', subset: '⊂', subseteq: '⊆', supset: '⊃', cup: '∪', cap: '∩', setminus: '∖', emptyset: '∅', varnothing: '∅',
+  rightarrow: '→', to: '→', leftarrow: '←', Rightarrow: '⇒', Leftarrow: '⇐', Leftrightarrow: '⇔', iff: '⇔', implies: '⇒', mapsto: '↦', angle: '∠', perp: '⊥', parallel: '∥', triangle: '△', sim: '∼', simeq: '≃', cong: '≅', equiv: '≡', propto: '∝', forall: '∀', exists: '∃', neg: '¬', land: '∧', lor: '∨', mid: '∣', nmid: '∤', prime: '′', circ: '∘', bullet: '•', cdots: '⋯', ldots: '…', dots: '…', vdots: '⋮', ddots: '⋱', degree: '°', circled: '°',
+};
+const MATH_FUNCS = new Set(['sin', 'cos', 'tan', 'cot', 'sec', 'csc', 'ln', 'log', 'exp', 'lim', 'min', 'max', 'sup', 'inf', 'det', 'gcd', 'lcm', 'arcsin', 'arccos', 'arctan', 'sinh', 'cosh', 'tanh', 'mod']);
+
+function mRun(text: string, upright = false): string {
+  if (!text) return '';
+  return `<m:r>${upright ? '<m:rPr><m:sty m:val="p"/></m:rPr>' : ''}<w:rPr><w:rFonts w:ascii="Cambria Math" w:hAnsi="Cambria Math"/></w:rPr><m:t xml:space="preserve">${xmlEscape(text)}</m:t></m:r>`;
+}
+
+function latexToOmml(input: string): string {
+  const s = String(input ?? '');
+  let i = 0;
+  const peek = () => s[i] ?? '';
+  function readGroup(): string {
+    if (peek() !== '{') return parsePrimary();
+    i++;
+    let out = '';
+    while (i < s.length && peek() !== '}') out += parseTerm();
+    if (peek() === '}') i++;
+    return out;
+  }
+  function readBracket(): string {
+    if (peek() !== '[') return '';
+    i++;
+    let out = '';
+    while (i < s.length && peek() !== ']') out += parseTerm();
+    if (peek() === ']') i++;
+    return out;
+  }
+  function parsePrimary(): string {
+    const ch = peek();
+    if (!ch) return '';
+    if (ch === '{') return readGroup();
+    if (ch === '\\') {
+      i++;
+      const m = /^[a-zA-Z]+/.exec(s.slice(i));
+      if (!m) { const c = s[i] ?? ''; i++; return mRun(c === ',' || c === ';' || c === ' ' ? ' ' : c); }
+      const cmd = m[0];
+      i += cmd.length;
+      if (cmd === 'frac' || cmd === 'dfrac' || cmd === 'tfrac') { const num = readGroup(); const den = readGroup(); return `<m:f><m:fPr><m:type m:val="bar"/></m:fPr><m:num>${num}</m:num><m:den>${den}</m:den></m:f>`; }
+      if (cmd === 'sqrt') { const deg = readBracket(); const e = readGroup(); return `<m:rad><m:radPr>${deg ? '' : '<m:degHide m:val="1"/>'}</m:radPr><m:deg>${deg}</m:deg><m:e>${e}</m:e></m:rad>`; }
+      if (cmd === 'sum' || cmd === 'prod' || cmd === 'int' || cmd === 'iint' || cmd === 'oint') {
+        const chr = cmd === 'sum' ? '∑' : cmd === 'prod' ? '∏' : cmd === 'oint' ? '∮' : cmd === 'iint' ? '∬' : '∫';
+        let sub = ''; let sup = '';
+        for (let k = 0; k < 2; k++) { if (peek() === '_') { i++; sub = readGroup(); } else if (peek() === '^') { i++; sup = readGroup(); } }
+        const e = i < s.length && peek() !== '}' ? parseTerm() : '';
+        return `<m:nary><m:naryPr><m:chr m:val="${chr}"/><m:limLoc m:val="subSup"/><m:grow m:val="1"/></m:naryPr><m:sub>${sub}</m:sub><m:sup>${sup}</m:sup><m:e>${e}</m:e></m:nary>`;
+      }
+      if (cmd === 'left') {
+        const open = s[i] ?? ''; i++;
+        let inner = '';
+        while (i < s.length && !s.startsWith('\\right', i)) inner += parseTerm();
+        if (s.startsWith('\\right', i)) i += 6;
+        const close = s[i] ?? ''; i++;
+        const beg = open === '(' ? '(' : open === '[' ? '[' : open === '{' ? '{' : open === '|' ? '|' : '';
+        const end = close === ')' ? ')' : close === ']' ? ']' : close === '}' ? '}' : close === '|' ? '|' : '';
+        return `<m:d><m:dPr>${beg ? `<m:begChr m:val="${beg}"/>` : '<m:begChr m:val=""/>' }${end ? `<m:endChr m:val="${end}"/>` : '<m:endChr m:val=""/>'}</m:dPr><m:e>${inner}</m:e></m:d>`;
+      }
+      if (cmd === 'begin') {
+        const env = readGroup().replace(/<[^>]+>/g, '');
+        const endMark = `\\end{${env}}`;
+        const start = i;
+        const endIdx = s.indexOf(endMark, i);
+        const raw = endIdx >= 0 ? s.slice(start, endIdx) : s.slice(start);
+        i = endIdx >= 0 ? endIdx + endMark.length : s.length;
+        const rows = raw.split(/\\\\/).map((r) => r.trim()).filter(Boolean);
+        if (env === 'cases') {
+          const eqRows = rows.map((r) => `<m:e>${latexToOmmlInner(r)}</m:e>`).join('');
+          return `<m:d><m:dPr><m:begChr m:val="{"/><m:endChr m:val=""/></m:dPr><m:e><m:eqArr>${eqRows}</m:eqArr></m:e></m:d>`;
+        }
+        const mRows = rows.map((r) => `<m:mr>${r.split('&').map((c) => `<m:e>${latexToOmmlInner(c.trim())}</m:e>`).join('')}</m:mr>`).join('');
+        const matrix = `<m:m>${mRows}</m:m>`;
+        if (env === 'pmatrix') return `<m:d><m:dPr><m:begChr m:val="("/><m:endChr m:val=")"/></m:dPr><m:e>${matrix}</m:e></m:d>`;
+        if (env === 'bmatrix') return `<m:d><m:dPr><m:begChr m:val="["/><m:endChr m:val="]"/></m:dPr><m:e>${matrix}</m:e></m:d>`;
+        if (env === 'vmatrix') return `<m:d><m:dPr><m:begChr m:val="|"/><m:endChr m:val="|"/></m:dPr><m:e>${matrix}</m:e></m:d>`;
+        return matrix;
+      }
+      if (cmd === 'text' || cmd === 'mathrm' || cmd === 'textbf' || cmd === 'textit') {
+        const start = i;
+        if (peek() === '{') { let depth = 0; let j = i; while (j < s.length) { if (s[j] === '{') depth++; if (s[j] === '}') { depth--; if (!depth) break; } j++; } const raw = s.slice(start + 1, j); i = j + 1; return mRun(raw, true); }
+        return '';
+      }
+      if (cmd === 'mathbb') { const g = readGroup().replace(/<[^>]+>/g, ''); const map: Record<string, string> = { R: 'ℝ', Z: 'ℤ', N: 'ℕ', Q: 'ℚ', C: 'ℂ' }; return mRun(map[g] ?? g, true); }
+      if (cmd === 'overline' || cmd === 'bar') return `<m:bar><m:barPr><m:pos m:val="top"/></m:barPr><m:e>${readGroup()}</m:e></m:bar>`;
+      if (cmd === 'underline') return `<m:bar><m:barPr><m:pos m:val="bot"/></m:barPr><m:e>${readGroup()}</m:e></m:bar>`;
+      if (cmd === 'hat') return `<m:acc><m:accPr><m:chr m:val="̂"/></m:accPr><m:e>${readGroup()}</m:e></m:acc>`;
+      if (cmd === 'vec') return `<m:acc><m:accPr><m:chr m:val="⃗"/></m:accPr><m:e>${readGroup()}</m:e></m:acc>`;
+      if (cmd === 'tilde') return `<m:acc><m:accPr><m:chr m:val="̃"/></m:accPr><m:e>${readGroup()}</m:e></m:acc>`;
+      if (cmd === 'dot') return `<m:acc><m:accPr><m:chr m:val="̇"/></m:accPr><m:e>${readGroup()}</m:e></m:acc>`;
+      if (cmd === 'lim') { let sub = ''; if (peek() === '_') { i++; sub = readGroup(); } return sub ? `<m:sSub><m:e>${mRun('lim', true)}</m:e><m:sub>${sub}</m:sub></m:sSub>` : mRun('lim', true); }
+      if (MATH_FUNCS.has(cmd)) return mRun(cmd, true);
+      if (MATH_SYMBOLS[cmd]) return mRun(MATH_SYMBOLS[cmd]);
+      if (cmd === 'quad' || cmd === 'qquad') return mRun('  ');
+      if (peek() === '{') return readGroup();
+      return '';
+    }
+    if (ch === '^' || ch === '_' || ch === '}') return '';
+    i++;
+    if (/[0-9]/.test(ch)) {
+      let num = ch;
+      while (/[0-9.,]/.test(peek())) { num += s[i]; i++; }
+      return mRun(num);
+    }
+    return mRun(ch);
+  }
+  function parseTerm(): string {
+    let base = parsePrimary();
+    if (!base) { if (i < s.length && peek() !== '}') i++; return ''; }
+    let sub = ''; let sup = '';
+    for (let k = 0; k < 2; k++) {
+      if (peek() === '^') { i++; sup = readGroup(); }
+      else if (peek() === '_') { i++; sub = readGroup(); }
+    }
+    if (sub && sup) return `<m:sSubSup><m:e>${base}</m:e><m:sub>${sub}</m:sub><m:sup>${sup}</m:sup></m:sSubSup>`;
+    if (sup) return `<m:sSup><m:e>${base}</m:e><m:sup>${sup}</m:sup></m:sSup>`;
+    if (sub) return `<m:sSub><m:e>${base}</m:e><m:sub>${sub}</m:sub></m:sSub>`;
+    return base;
+  }
+  let out = '';
+  while (i < s.length) out += parseTerm();
+  return out;
+}
+
+function latexToOmmlInner(s: string): string {
+  return latexToOmml(s);
+}
+
 function xmlEscape(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
@@ -753,7 +883,17 @@ export default function App() {
   function exportDocx() {
     const enc = new TextEncoder();
     const run = (text: string, bold = false, size = 24) => `<w:r><w:rPr>${bold ? '<w:b/>' : ''}<w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"/><w:sz w:val="${size}"/></w:rPr><w:t xml:space="preserve">${xmlEscape(text)}</w:t></w:r>`;
-    const para = (text: string, opts: { bold?: boolean; size?: number; align?: string; indent?: number; before?: number; after?: number } = {}) => `<w:p><w:pPr>${opts.align ? `<w:jc w:val="${opts.align}"/>` : ''}${opts.indent ? `<w:ind w:left="${opts.indent}"/>` : ''}<w:spacing w:before="${opts.before ?? 0}" w:after="${opts.after ?? 60}" w:line="312" w:lineRule="auto"/></w:pPr>${run(text, opts.bold, opts.size ?? 24)}</w:p>`;
+    const richRuns = (text: string, bold = false, size = 24): string => {
+      const parts = String(text ?? '').split(/(\$\$[\s\S]*?\$\$|\$[^$]*\$|\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\])/g);
+      return parts.map((p) => {
+        if (/^\$\$[\s\S]*\$\$$/.test(p)) return `<m:oMath>${latexToOmml(p.slice(2, -2))}</m:oMath>`;
+        if (/^\$[^$]*\$$/.test(p)) return `<m:oMath>${latexToOmml(p.slice(1, -1))}</m:oMath>`;
+        if (/^\\\([\s\S]*\\\)$/.test(p)) return `<m:oMath>${latexToOmml(p.slice(2, -2))}</m:oMath>`;
+        if (/^\\\[[\s\S]*\\\]$/.test(p)) return `<m:oMath>${latexToOmml(p.slice(2, -2))}</m:oMath>`;
+        return p ? run(p, bold, size) : '';
+      }).join('');
+    };
+    const para = (text: string, opts: { bold?: boolean; size?: number; align?: string; indent?: number; before?: number; after?: number; rich?: boolean } = {}) => `<w:p><w:pPr>${opts.align ? `<w:jc w:val="${opts.align}"/>` : ''}${opts.indent ? `<w:ind w:left="${opts.indent}"/>` : ''}<w:spacing w:before="${opts.before ?? 0}" w:after="${opts.after ?? 60}" w:line="312" w:lineRule="auto"/></w:pPr>${opts.rich ? richRuns(text, opts.bold, opts.size ?? 24) : run(text, opts.bold, opts.size ?? 24)}</w:p>`;
     const body: string[] = [];
     generated.forEach((code, ci) => {
       if (ci > 0) body.push('<w:p><w:r><w:br w:type="page"/></w:r></w:p>');
@@ -764,16 +904,16 @@ export default function App() {
         if (!qs.length) continue;
         body.push(para(`${QTYPE_LABEL[qt]} (${fmtPoints(partPointsOf(qs))} điểm)`, { bold: true, before: 120, after: 80 }));
         qs.forEach((q, i) => {
-          body.push(para(`Câu ${i + 1}. ${latexToText(q.content)}`, { after: 40 }));
-          (q.options ?? []).forEach((op, oi) => body.push(para(`${'ABCD'[oi] ?? oi + 1}. ${latexToText(op)}`, { indent: 360, after: 20 })));
+          body.push(para(`Câu ${i + 1}. ${q.content}`, { after: 40, rich: true }));
+          (q.options ?? []).forEach((op, oi) => body.push(para(`${'ABCD'[oi] ?? oi + 1}. ${op}`, { indent: 360, after: 20, rich: true })));
           if (showAnswers) {
-            body.push(para(`Đáp án: ${latexToText(q.correct)}`, { bold: true, indent: 360, after: 20 }));
-            if (q.explanation) body.push(para(latexToText(q.explanation), { indent: 360, after: 80 }));
+            body.push(para(`Đáp án: ${q.correct}`, { bold: true, indent: 360, after: 20, rich: true }));
+            if (q.explanation) body.push(para(q.explanation, { indent: 360, after: 80, rich: true }));
           }
         });
       }
     });
-    const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${body.join('')}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134"/></w:sectPr></w:body></w:document>`;
+    const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><w:body>${body.join('')}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134"/></w:sectPr></w:body></w:document>`;
     const stylesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"/><w:sz w:val="24"/></w:rPr></w:style></w:styles>`;
     const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>`;
     const rels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`;
