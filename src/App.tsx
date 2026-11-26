@@ -230,6 +230,8 @@ export default function App() {
   const [aiBusy, setAiBusy] = useState(false);
   const [aiStatus, setAiStatus] = useState('Đang kiểm tra AI…');
   const [aiMessages, setAiMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([{ role: 'assistant', content: 'Thầy hỏi em về bài toán, cách tạo đề hoặc câu đang xem nhé.' }]);
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const [showInstallHelp, setShowInstallHelp] = useState(false);
 
   const bankParams = useMemo(() => {
     const p = eqParams({ grade, level: level || undefined, qtype: qtype || undefined });
@@ -641,6 +643,21 @@ export default function App() {
   useEffect(() => {
     fetch('/api/ai-chat').then((r) => r.json()).then((d) => setAiStatus(d.enabled ? `AI đã bật: ${(d.providers || []).join(', ')}` : 'AI chưa bật: đặt GROQ_API_KEY hoặc GEMINI_API_KEY trong Vercel')).catch(() => setAiStatus('AI chưa bật'));
   }, []);
+  useEffect(() => {
+    const handler = (e: Event) => { e.preventDefault(); setInstallPrompt(e); };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  async function installApp() {
+    if (installPrompt) {
+      await installPrompt.prompt();
+      await installPrompt.userChoice.catch(() => null);
+      setInstallPrompt(null);
+      return;
+    }
+    setShowInstallHelp(true);
+  }
 
   function aiContext(): string {
     const parts = [`Mục đang mở: ${tab}`, `Lớp tạo đề: ${mGrade}`, `Phạm vi: ${scopeMode === 'chapter' ? mChapter : scopeMode === 'lesson' ? mLesson : 'Toàn khối'}`];
@@ -673,6 +690,7 @@ export default function App() {
         <div>
           <h1>Toán THPT Thầy Đôi</h1>
           <p>Ngân hàng câu hỏi, lý thuyết và ma trận đề Toán THPT</p>
+          <button className="install-btn" onClick={() => void installApp()}>📲 Cài ứng dụng</button>
         </div>
         <nav>
           {([['overview', 'Tổng quan'], ['bank', 'Ngân hàng câu hỏi'], ['theory', 'Lý thuyết'], ['matrix', 'Tạo đề'], ['print', 'In đề'], ['assign', 'Giao bài'], ['take', 'Học sinh làm bài'], ['results', 'Kết quả'], ['admin', 'Quản trị']] as [Tab, string][]).map(([t, label]) => (
@@ -680,6 +698,11 @@ export default function App() {
           ))}
         </nav>
       </header>
+      {showInstallHelp && (
+        <section className="notice no-print">
+          <strong>Cài ứng dụng:</strong> Android mở bằng Chrome rồi bấm <b>Cài ứng dụng</b> hoặc menu ⋮ → <b>Cài đặt ứng dụng</b>. iPhone mở bằng Safari → <b>Chia sẻ</b> → <b>Thêm vào màn hình chính</b>. <button onClick={() => setShowInstallHelp(false)}>Đóng</button>
+        </section>
+      )}
 
       {!isSupabaseConfigured && (
         <section className="notice no-print">

@@ -50,3 +50,4 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .ai-head{display:flex;align-items:center;gap:8px;padding:12px 14px;background:#eff6ff;border-bottom:1px solid #dbeafe}.ai-head span{flex:1;color:#475569;font-size:12px}.ai-head button{border:0;background:transparent;font-size:22px;cursor:pointer}
 .ai-messages{padding:12px;overflow:auto;display:flex;flex-direction:column;gap:8px;background:#f8fafc}.ai-msg{padding:9px 11px;border-radius:14px;max-width:88%;white-space:pre-wrap;line-height:1.45}.ai-msg.user{align-self:flex-end;background:#2563eb;color:#fff}.ai-msg.assistant{align-self:flex-start;background:#fff;border:1px solid #e2e8f0}
 .ai-input{display:flex;gap:8px;padding:10px;border-top:1px solid #e2e8f0;background:#fff}.ai-input textarea{flex:1;resize:none;border:1px solid #cbd5e1;border-radius:12px;padding:9px}
+.install-btn{margin-top:8px;background:#2563eb;color:#fff;border:0;border-radius:999px;padding:8px 14px;font-weight:700;cursor:pointer}
