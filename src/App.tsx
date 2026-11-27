@@ -3,7 +3,7 @@ import MathText from './MathText';
 import { eqParams, getSession, ilike, isSupabaseConfigured, signIn, signOut, signUp, recoverPassword, resendConfirmation, updatePassword, supabaseCount, supabaseDelete, supabaseGet, supabaseInsert, supabaseUpdate, type AuthSession } from './supabase';
 import { LEVELS, QTYPES, QTYPE_LABEL, type Assignment, type ClassRecord, type ExamRecord, type Level, type QType, type Question, type StudentRecord, type Submission, type TheoryNote } from './types';
 
-type Tab = 'overview' | 'bank' | 'theory' | 'english' | 'matrix' | 'print' | 'assign' | 'take' | 'results' | 'admin' | 'users';
+type Tab = 'overview' | 'bank' | 'theory' | 'english' | 'matrix' | 'print' | 'assign' | 'take' | 'results' | 'admin' | 'users' | 'practice';
 
 interface GeneratedCode {
   code: number;
@@ -491,6 +491,12 @@ export default function App() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [userSearch, setUserSearch] = useState('');
+  const [practiceMode, setPracticeMode] = useState<'vi' | 'en'>('vi');
+  const [practiceGrade, setPracticeGrade] = useState('12');
+  const [practiceLevel, setPracticeLevel] = useState('');
+  const [practiceQs, setPracticeQs] = useState<{ content: string; options: string[]; correctIndex: number; explanation: string }[]>([]);
+  const [practiceAnswers, setPracticeAnswers] = useState<Record<number, number>>({});
+  const [practiceChecked, setPracticeChecked] = useState(false);
   const [userFilter, setUserFilter] = useState<'all' | 'student' | 'teacher' | 'trial' | 'full' | 'english' | 'requested' | 'limited'>('all');
   const [examTitle, setExamTitle] = useState('Đề Toán THPT');
   const [duration, setDuration] = useState(45);
@@ -606,6 +612,37 @@ export default function App() {
 
   function toggleMastered(id: string) {
     setMastered((prev) => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); localStorage.setItem('english-vocab-mastered', JSON.stringify(Array.from(next))); return next; });
+  }
+
+  function correctIndexOf(correct: string, options: string[]): number {
+    const c = String(correct || '').trim();
+    const m = c.match(/^[A-D]/i);
+    if (m) return 'ABCD'.indexOf(m[0].toUpperCase());
+    const norm = (x: string) => x.replace(/^[A-D][.)]\s*/i, '').replace(/\$/g, '').trim().toLowerCase();
+    const idx = options.findIndex((o) => norm(o) === norm(c) || norm(o).includes(norm(c)) || norm(c).includes(norm(o)));
+    return idx >= 0 ? idx : 0;
+  }
+
+  async function startPractice() {
+    setLoading(true); setError(''); setPracticeChecked(false); setPracticeAnswers({});
+    try {
+      if (practiceMode === 'en' && !hasEnglish) { setError('Toán tiếng Anh cần quyền truy cập hoặc đang dùng thử.'); return; }
+      const table = practiceMode === 'en' ? 'english_questions' : 'questions';
+      const p = eqParams({ grade: practiceGrade, qtype: 'single', level: practiceLevel || undefined });
+      const total = await supabaseCount(table, p, practiceMode === 'en');
+      if (!total) { setPracticeQs([]); setError('Chưa có câu trắc nghiệm khớp lựa chọn.'); return; }
+      const offset = Math.floor(Math.random() * Math.max(1, total - 10));
+      p.set('select', '*'); p.set('limit', '30'); p.set('offset', String(offset));
+      if (practiceMode === 'en') {
+        const rows = await supabaseGet<EnglishQuestion[]>(table, p, true);
+        const qs = rows.filter((r) => r.options?.length >= 2).slice(0, 10).map((r) => ({ content: r.problem, options: r.options, correctIndex: correctIndexOf(r.answer, r.options), explanation: `${r.solution_en} ${r.solution_vi}` }));
+        setPracticeQs(qs);
+      } else {
+        const rows = await supabaseGet<Question[]>(table, p);
+        const qs = rows.filter((r) => r.options?.length >= 2).slice(0, 10).map((r) => ({ content: stripSourcePrefix(r.content), options: r.options.map(stripOptionPrefix), correctIndex: correctIndexOf(r.correct, r.options), explanation: r.explanation || `Đáp án: ${r.correct}` }));
+        setPracticeQs(qs);
+      }
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setLoading(false); }
   }
 
   async function loadEnglish(nextPage = englishPage) {
@@ -1386,7 +1423,7 @@ export default function App() {
           <button className="install-btn" onClick={() => void installApp()}>📲 Cài ứng dụng</button>
         </div>
         <nav>
-          {([['overview', 'Tổng quan'], ['bank', 'Ngân hàng câu hỏi'], ['theory', 'Lý thuyết'], ['english', 'Toán tiếng Anh'], ['matrix', 'Tạo đề'], ['print', 'In đề'], ['assign', 'Giao bài'], ['take', 'Học sinh làm bài'], ['results', 'Kết quả'], ['admin', 'Quản trị'], ...(isAdmin ? [['users', 'Quản lý người dùng'] as [Tab, string]] : [])] as [Tab, string][]).map(([t, label]) => (
+          {([['overview', 'Tổng quan'], ['bank', 'Ngân hàng câu hỏi'], ['theory', 'Lý thuyết'], ['english', 'Toán tiếng Anh'], ['matrix', 'Tạo đề'], ['print', 'In đề'], ['assign', 'Giao bài'], ['take', 'Học sinh làm bài'], ['results', 'Kết quả'], ['practice', 'Tự luyện'], ['admin', 'Quản trị'], ...(isAdmin ? [['users', 'Quản lý người dùng'] as [Tab, string]] : [])] as [Tab, string][]).map(([t, label]) => (
             <button key={t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)}>{label}</button>
           ))}
         </nav>
@@ -1684,6 +1721,35 @@ export default function App() {
           </div>
           {submissions.length > 0 && <p className="notice">Số bài nộp: {submissions.length} · Điểm trung bình: {(submissions.reduce((s, x) => s + Number(x.score ?? 0), 0) / submissions.length).toFixed(2)}</p>}
           <div className="tablewrap"><table><thead><tr><th>Học sinh</th><th>Lớp</th><th>Mã đề</th><th>Điểm</th><th>Tự luận</th><th>Trạng thái</th><th>Chấm tự luận</th></tr></thead><tbody>{submissions.map((s) => <tr key={s.id}><td>{s.student_name}</td><td>{s.class_name ?? ''}</td><td>{s.code_index + 1}</td><td>{s.score ?? '—'}</td><td>{s.essay_score ?? '—'}</td><td>{s.status ?? ''}</td><td><input type="number" step="0.25" value={essayScores[String(s.id)] ?? ''} onChange={(e) => setEssayScores({ ...essayScores, [String(s.id)]: e.target.value })} /> <button onClick={() => void gradeEssay(s)}>Lưu</button></td></tr>)}</tbody></table></div>
+        </main>
+      )}
+
+      {tab === 'practice' && (
+        <main>
+          <section className="card"><h2>Tự luyện trắc nghiệm</h2>
+            <div className="filters">
+              <button className={practiceMode === 'vi' ? 'primary' : ''} onClick={() => setPracticeMode('vi')}>Toán tiếng Việt</button>
+              <button className={practiceMode === 'en' ? 'primary' : ''} onClick={() => setPracticeMode('en')}>Toán tiếng Anh</button>
+              <label>Lớp<select value={practiceGrade} onChange={(e) => setPracticeGrade(e.target.value)}><option>10</option><option>11</option><option>12</option></select></label>
+              <label>Mức độ<select value={practiceLevel} onChange={(e) => setPracticeLevel(e.target.value)}><option value="">Tất cả</option>{LEVELS.map((l) => <option key={l} value={l}>{l}</option>)}</select></label>
+              <button className="primary" onClick={() => void startPractice()}>Bắt đầu 10 câu</button>
+            </div>
+            {practiceMode === 'en' && !hasEnglish && <p className="notice">Toán tiếng Anh cần đang dùng thử hoặc được quản trị cấp quyền.</p>}
+            {practiceChecked && <p className="notice">Kết quả: {practiceQs.filter((q, i) => practiceAnswers[i] === q.correctIndex).length}/{practiceQs.length} câu đúng.</p>}
+          </section>
+          {practiceQs.map((q, i) => (
+            <section className="card" key={i}>
+              <p><strong>Câu {i + 1}.</strong> <MathText text={q.content} /></p>
+              {q.options.map((op, oi) => (
+                <label className="check" key={oi} style={practiceChecked ? { fontWeight: oi === q.correctIndex ? 700 : 400 } : undefined}>
+                  <input type="radio" name={`pq-${i}`} checked={practiceAnswers[i] === oi} disabled={practiceChecked} onChange={() => setPracticeAnswers({ ...practiceAnswers, [i]: oi })} /> {'ABCD'[oi]}. <MathText text={op} />{practiceChecked && oi === q.correctIndex ? ' ✓' : practiceChecked && practiceAnswers[i] === oi ? ' ✗' : ''}
+                </label>
+              ))}
+              {practiceChecked && <p><strong>Lời giải:</strong> <MathText text={q.explanation} /></p>}
+            </section>
+          ))}
+          {practiceQs.length > 0 && !practiceChecked && <button className="primary" onClick={() => setPracticeChecked(true)}>Nộp bài</button>}
+          {practiceChecked && <button onClick={() => void startPractice()}>Làm bộ mới</button>}
         </main>
       )}
 
