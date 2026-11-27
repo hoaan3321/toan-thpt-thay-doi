@@ -45,6 +45,12 @@ function optionLayout(options: string[]): 4 | 2 | 1 {
   return 1;
 }
 
+function examDateTime(): string {
+  const d = new Date();
+  const pad = (v: number) => String(v).padStart(2, '0');
+  return `Ngày ${pad(d.getDate())} tháng ${pad(d.getMonth() + 1)} năm ${d.getFullYear()}, ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 function fmtPoints(n: number): string {
   const v = Math.round(Number(n || 0) * 1000) / 1000;
   return String(v).replace('.', ',');
@@ -916,7 +922,7 @@ export default function App() {
     generated.forEach((code, ci) => {
       if (ci > 0) body.push('<w:p><w:r><w:br w:type="page"/></w:r></w:p>');
       body.push(para(`${kind === 'dapan' ? 'ĐÁP ÁN ĐỀ' : 'ĐỀ'} TOÁN LỚP ${mGrade} — MÃ ĐỀ ${String(code.code).padStart(2, '0')}`, { bold: true, size: 28, align: 'center', after: 40 }));
-      body.push(para(`Thời gian: ${duration} phút · Tổng điểm: ${fmtPoints(code.rawPoints)} điểm`, { align: 'center', after: 120 }));
+      body.push(para(`Thời gian: ${duration} phút · Tổng điểm: ${fmtPoints(code.rawPoints)} điểm · ${examDateTime()}`, { align: 'center', after: 120 }));
       for (const qt of QTYPES) {
         const qs = code.questions.filter((q) => q.qtype === qt);
         if (!qs.length) continue;
@@ -964,7 +970,7 @@ export default function App() {
     ];
     generated.forEach((code, ci) => {
       if (ci > 0) lines.push('\\newpage');
-      lines.push(`\\begin{center}\\textbf{\\large ${kind === 'dapan' ? 'ĐÁP ÁN ĐỀ' : 'ĐỀ'} TOÁN LỚP ${mGrade} --- MÃ ĐỀ ${String(code.code).padStart(2, '0')}}\\\\[2pt] Thời gian: ${duration} phút \\quad Tổng điểm: ${fmtPoints(code.rawPoints)} điểm\\end{center}`);
+      lines.push(`\\begin{center}\\textbf{\\large ${kind === 'dapan' ? 'ĐÁP ÁN ĐỀ' : 'ĐỀ'} TOÁN LỚP ${mGrade} --- MÃ ĐỀ ${String(code.code).padStart(2, '0')}}\\\\[2pt] Thời gian: ${duration} phút \\quad Tổng điểm: ${fmtPoints(code.rawPoints)} điểm \\quad ${examDateTime()}\\end{center}`);
       for (const qt of QTYPES) {
         const qs = code.questions.filter((q) => q.qtype === qt);
         if (!qs.length) continue;
@@ -1223,7 +1229,7 @@ export default function App() {
           {generated.map((code) => (
             <section className="exam" key={code.code}>
               <h2>Đề Toán lớp {mGrade} — Mã đề {String(code.code).padStart(2, '0')}</h2>
-              <p className="meta">Tổng điểm: {fmtPoints(code.rawPoints)} điểm.</p>
+              <p className="meta">Thời gian: {duration} phút · Tổng điểm: {fmtPoints(code.rawPoints)} điểm · {examDateTime()}</p>
               {QTYPES.map((qt) => {
                 const qs = code.questions.filter((q) => q.qtype === qt);
                 if (!qs.length) return null;
