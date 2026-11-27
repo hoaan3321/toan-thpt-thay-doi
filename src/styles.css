@@ -95,3 +95,13 @@ button.primary, button.active { background: #2563eb; border-color: #2563eb; }
   .app-clock { font-size: 13px; }
   .grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
 }
+
+/* Toán tiếng Anh 2026-11-27 */
+.english-hero { background: linear-gradient(135deg, #eff6ff 0%, #ffffff 58%, #ecfeff 100%); border-color: #bfdbfe; }
+.english-hero h2 { color: #1d4ed8; }
+.english-card h2 { color: #172033; }
+.vocab-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 4px; }
+.vocab-chip { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e3a8a; border-radius: 999px; padding: 5px 10px; font-size: 13px; }
+.solution-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.solution-grid h3 { margin: 4px 0 6px; color: #166534; }
+@media (max-width: 720px) { .solution-grid { grid-template-columns: 1fr; } }

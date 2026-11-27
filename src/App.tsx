@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import MathText from './MathText';
 import { eqParams, getSession, ilike, isSupabaseConfigured, signIn, signOut, signUp, supabaseCount, supabaseDelete, supabaseGet, supabaseInsert, supabaseUpdate, type AuthSession } from './supabase';
 import { LEVELS, QTYPES, QTYPE_LABEL, type Assignment, type ClassRecord, type ExamRecord, type Level, type QType, type Question, type StudentRecord, type Submission, type TheoryNote } from './types';
+import { ENGLISH_MATH_PROBLEMS } from './englishMath';
 
-type Tab = 'overview' | 'bank' | 'theory' | 'matrix' | 'print' | 'assign' | 'take' | 'results' | 'admin';
+type Tab = 'overview' | 'bank' | 'theory' | 'english' | 'matrix' | 'print' | 'assign' | 'take' | 'results' | 'admin';
 
 interface GeneratedCode {
   code: number;
@@ -413,6 +414,14 @@ export default function App() {
   const [theoryGrade, setTheoryGrade] = useState(12);
   const [theory, setTheory] = useState<TheoryNote[]>([]);
 
+  const [englishGrade, setEnglishGrade] = useState<'all' | 10 | 11 | 12>('all');
+  const [englishLevel, setEnglishLevel] = useState('');
+  const [englishTopic, setEnglishTopic] = useState('');
+  const [englishSearch, setEnglishSearch] = useState('');
+  const [englishOnlyInteresting, setEnglishOnlyInteresting] = useState(false);
+  const [englishShowAllSolutions, setEnglishShowAllSolutions] = useState(false);
+  const [englishOpenId, setEnglishOpenId] = useState<string | null>(null);
+
   const [mGrade, setMGrade] = useState(12);
   const [scopeMode, setScopeMode] = useState<'all' | 'chapter' | 'lesson'>('all');
   const [mChapter, setMChapter] = useState('');
@@ -469,6 +478,26 @@ export default function App() {
     }
     return p;
   }, [grade, chapter, dang, level, qtype, search]);
+
+  const englishTopics = useMemo(() => Array.from(new Set(ENGLISH_MATH_PROBLEMS.map((p) => p.topic))).sort(), []);
+  const englishProblems = useMemo(() => {
+    const needle = englishSearch.trim().toLowerCase();
+    return ENGLISH_MATH_PROBLEMS.filter((p) => {
+      if (englishGrade !== 'all' && p.grade !== englishGrade) return false;
+      if (englishLevel && p.level !== englishLevel) return false;
+      if (englishTopic && p.topic !== englishTopic) return false;
+      if (englishOnlyInteresting && !p.interesting) return false;
+      if (!needle) return true;
+      const haystack = `${p.title} ${p.topic} ${p.topicVi} ${p.problem} ${p.answer} ${p.solutionEn} ${p.solutionVi} ${p.vocabulary.map((v) => `${v.term} ${v.meaning}`).join(' ')}`.toLowerCase();
+      return haystack.includes(needle);
+    });
+  }, [englishGrade, englishLevel, englishTopic, englishOnlyInteresting, englishSearch]);
+
+  function pickRandomEnglishProblem() {
+    const pool = englishProblems.length ? englishProblems : ENGLISH_MATH_PROBLEMS;
+    const picked = pool[Math.floor(Math.random() * pool.length)];
+    if (picked) setEnglishOpenId(picked.id);
+  }
 
   async function loadOverview() {
     if (!isSupabaseConfigured) return;
@@ -1159,12 +1188,12 @@ export default function App() {
       <header className="topbar no-print">
         <div>
           <h1>Toán THPT Thầy Đôi</h1>
-          <p>Ngân hàng câu hỏi, lý thuyết và ma trận đề Toán THPT</p>
+          <p>Ngân hàng câu hỏi, lý thuyết, Toán tiếng Anh và ma trận đề Toán THPT</p>
           <AppClock />
           <button className="install-btn" onClick={() => void installApp()}>📲 Cài ứng dụng</button>
         </div>
         <nav>
-          {([['overview', 'Tổng quan'], ['bank', 'Ngân hàng câu hỏi'], ['theory', 'Lý thuyết'], ['matrix', 'Tạo đề'], ['print', 'In đề'], ['assign', 'Giao bài'], ['take', 'Học sinh làm bài'], ['results', 'Kết quả'], ['admin', 'Quản trị']] as [Tab, string][]).map(([t, label]) => (
+          {([['overview', 'Tổng quan'], ['bank', 'Ngân hàng câu hỏi'], ['theory', 'Lý thuyết'], ['english', 'Toán tiếng Anh'], ['matrix', 'Tạo đề'], ['print', 'In đề'], ['assign', 'Giao bài'], ['take', 'Học sinh làm bài'], ['results', 'Kết quả'], ['admin', 'Quản trị']] as [Tab, string][]).map(([t, label]) => (
             <button key={t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)}>{label}</button>
           ))}
         </nav>
@@ -1201,6 +1230,7 @@ export default function App() {
           <section className="card"><h2>Theo lớp</h2>{[10, 11, 12].map((g) => <p key={g}>Lớp {g}: <strong>{overview?.byGrade[g] ?? '—'}</strong></p>)}</section>
           <section className="card"><h2>Theo mức</h2>{LEVELS.map((l) => <p key={l}>{l}: <strong>{overview?.byLevel[l] ?? '—'}</strong></p>)}</section>
           <section className="card"><h2>Theo phần</h2>{QTYPES.map((q) => <p key={q}>{QTYPE_LABEL[q]}: <strong>{overview?.byType[q] ?? '—'}</strong></p>)}</section>
+          <section className="card"><h2>Toán tiếng Anh</h2><p className="big">{ENGLISH_MATH_PROBLEMS.length}</p><p>Bài toán THPT bằng tiếng Anh, có đáp án, lời giải Anh–Việt và từ vựng.</p><button className="primary" onClick={() => setTab('english')}>Mở mục Toán tiếng Anh</button></section>
         </main>
       )}
 
@@ -1237,6 +1267,51 @@ export default function App() {
               <div className="content"><MathText text={n.content} /></div>
             </article>
           ))}
+        </main>
+      )}
+
+      {tab === 'english' && (
+        <main>
+          <section className="card english-hero">
+            <h2>Toán tiếng Anh THPT</h2>
+            <p>Bài toán bằng tiếng Anh cho lớp 10–12, có đáp án, lời giải tiếng Anh, giải thích tiếng Việt và từ vựng trọng tâm. Học sinh nên tự làm trước rồi mới mở lời giải.</p>
+            <div className="filters no-print">
+              <button className="primary" onClick={pickRandomEnglishProblem}>Luyện nhanh 1 bài</button>
+              <label className="check"><input type="checkbox" checked={englishShowAllSolutions} onChange={(e) => setEnglishShowAllSolutions(e.target.checked)} /> Hiện tất cả lời giải</label>
+              <label className="check"><input type="checkbox" checked={englishOnlyInteresting} onChange={(e) => setEnglishOnlyInteresting(e.target.checked)} /> Chỉ câu hay</label>
+            </div>
+          </section>
+          <section className="filters no-print">
+            <label>Lớp<select value={String(englishGrade)} onChange={(e) => setEnglishGrade(e.target.value === 'all' ? 'all' : Number(e.target.value) as 10 | 11 | 12)}><option value="all">Tất cả</option><option value="10">Lớp 10</option><option value="11">Lớp 11</option><option value="12">Lớp 12</option></select></label>
+            <label>Mức<select value={englishLevel} onChange={(e) => setEnglishLevel(e.target.value)}><option value="">Tất cả</option><option>Foundation</option><option>Standard</option><option>Challenge</option></select></label>
+            <label>Chủ đề<select value={englishTopic} onChange={(e) => setEnglishTopic(e.target.value)}><option value="">Tất cả</option>{englishTopics.map((t) => <option key={t}>{t}</option>)}</select></label>
+            <label>Tìm kiếm<input value={englishSearch} onChange={(e) => setEnglishSearch(e.target.value)} placeholder="probability, đạo hàm, Bayes..." /></label>
+          </section>
+          <p className="muted">Có {englishProblems.length} bài khớp bộ lọc · Tổng {ENGLISH_MATH_PROBLEMS.length} bài · Câu hay: {ENGLISH_MATH_PROBLEMS.filter((p) => p.interesting).length}</p>
+          {englishProblems.map((p) => {
+            const open = englishShowAllSolutions || englishOpenId === p.id;
+            return (
+              <article className="card english-card" key={p.id}>
+                <p className="meta">Grade {p.grade} · {p.topic} · {p.topicVi} · {p.level}{p.interesting ? ' · Câu hay' : ''}</p>
+                <h2>{p.title}</h2>
+                <div className="content"><MathText text={p.problem} /></div>
+                <div className="vocab-row">{p.vocabulary.map((v) => <span className="vocab-chip" key={v.term}><strong>{v.term}</strong>: {v.meaning}</span>)}</div>
+                <div className="filters no-print">
+                  <button className={open ? '' : 'primary'} onClick={() => setEnglishOpenId(open && !englishShowAllSolutions ? null : p.id)}>{open ? 'Ẩn lời giải' : 'Xem đáp án & lời giải'}</button>
+                </div>
+                {open && (
+                  <div className="answer">
+                    <p><strong>Answer:</strong> <MathText text={p.answer} /></p>
+                    <div className="solution-grid">
+                      <div><h3>Solution</h3><div className="content"><MathText text={p.solutionEn} /></div></div>
+                      <div><h3>Giải thích tiếng Việt</h3><div className="content"><MathText text={p.solutionVi} /></div></div>
+                    </div>
+                  </div>
+                )}
+              </article>
+            );
+          })}
+          {englishProblems.length === 0 && <section className="notice">Chưa có bài khớp bộ lọc. Thầy đổi lớp/chủ đề hoặc xóa từ khóa tìm kiếm nhé.</section>}
         </main>
       )}
 
