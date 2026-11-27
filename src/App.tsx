@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import MathText from './MathText';
 import { eqParams, getSession, ilike, isSupabaseConfigured, signIn, signOut, signUp, supabaseCount, supabaseDelete, supabaseGet, supabaseInsert, supabaseUpdate, type AuthSession } from './supabase';
 import { LEVELS, QTYPES, QTYPE_LABEL, type Assignment, type ClassRecord, type ExamRecord, type Level, type QType, type Question, type StudentRecord, type Submission, type TheoryNote } from './types';
-import { ENGLISH_MATH_PROBLEMS } from './englishMath';
 
 type Tab = 'overview' | 'bank' | 'theory' | 'english' | 'matrix' | 'print' | 'assign' | 'take' | 'results' | 'admin';
 
@@ -11,6 +10,31 @@ interface GeneratedCode {
   questions: Question[];
   rawPoints: number;
 }
+
+interface EnglishQuestion {
+  id: number;
+  grade: number;
+  lesson: string;
+  lesson_vi: string;
+  dang: string;
+  dang_vi: string;
+  level: string;
+  qtype: QType;
+  title: string;
+  problem: string;
+  options: string[];
+  answer: string;
+  solution_en: string;
+  solution_vi: string;
+  vocabulary: { term: string; meaning: string }[];
+  interesting: boolean;
+}
+
+const ENGLISH_LESSONS: Record<number, string[]> = {
+  10: ['Mệnh đề','Tập hợp','Các phép toán trên tập hợp','Bất phương trình bậc nhất hai ẩn','Hệ bất phương trình bậc nhất hai ẩn','Giá trị lượng giác của một góc từ 0° đến 180°','Hệ thức lượng trong tam giác','Các khái niệm mở đầu','Tổng và hiệu của hai vectơ','Tích của một vectơ với một số','Vectơ trong mặt phẳng tọa độ','Tích vô hướng của hai vectơ','Số gần đúng và sai số','Các số đặc trưng đo xu thế trung tâm','Các số đặc trưng đo độ phân tán','Hàm số','Hàm số bậc hai','Dấu của tam thức bậc hai','Phương trình quy về phương trình bậc hai','Phương trình đường thẳng','Vị trí tương đối giữa hai đường thẳng. Góc và khoảng cách','Đường tròn trong mặt phẳng tọa độ','Ba đường conic','Quy tắc đếm','Hoán vị, chỉnh hợp và tổ hợp','Nhị thức Newton','Biến cố và định nghĩa cổ điển của xác suất','Thực hành tính xác suất theo định nghĩa cổ điển','Hệ phương trình bậc nhất ba ẩn','Phương pháp quy nạp toán học. Nhị thức Newton','Ba đường conic và ứng dụng'],
+  11: ['Giá trị lượng giác của góc lượng giác','Công thức lượng giác','Hàm số lượng giác','Phương trình lượng giác','Dãy số','Cấp số cộng','Cấp số nhân','Mẫu số liệu ghép nhóm','Các số đặc trưng đo xu thế trung tâm cho mẫu số liệu ghép nhóm','Đường thẳng và mặt phẳng trong không gian','Hai đường thẳng song song','Đường thẳng song song với mặt phẳng','Hai mặt phẳng song song','Phép chiếu song song','Giới hạn của dãy số','Giới hạn của hàm số','Hàm số liên tục','Lũy thừa với số mũ thực','Lôgarit','Hàm số mũ và hàm số lôgarit','Phương trình, bất phương trình mũ và lôgarit','Hai đường thẳng vuông góc','Đường thẳng vuông góc với mặt phẳng','Phép chiếu vuông góc. Góc giữa đường thẳng và mặt phẳng','Hai mặt phẳng vuông góc','Khoảng cách','Thể tích','Biến cố hợp, biến cố giao, biến cố độc lập','Công thức cộng xác suất','Công thức nhân xác suất cho hai biến cố độc lập','Định nghĩa và ý nghĩa của đạo hàm','Các quy tắc tính đạo hàm','Đạo hàm cấp hai','Phép biến hình trong mặt phẳng','Làm quen với một vài khái niệm của lí thuyết đồ thị','Một số yếu tố vẽ kĩ thuật'],
+  12: ['Tính đơn điệu và cực trị của hàm số','Giá trị lớn nhất và giá trị nhỏ nhất của hàm số','Đường tiệm cận của đồ thị hàm số','Khảo sát sự biến thiên và vẽ đồ thị của hàm số','Ứng dụng đạo hàm để giải quyết một số vấn đề liên quan đến thực tiễn','Vectơ trong không gian','Hệ trục tọa độ trong không gian','Biểu thức toạ độ của các phép toán vectơ','Khoảng biến thiên và khoảng tứ phân vị','Phương sai và độ lệch chuẩn','Nguyên hàm','Tích phân','Ứng dụng hình học của tích phân','Phương trình mặt phẳng','Phương trình đường thẳng trong không gian','Phương trình mặt cầu','Công thức tính góc trong không gian','Xác suất có điều kiện','Công thức xác suất toàn phần và công thức Bayes'],
+};
 
 function makeJoinCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -421,7 +445,12 @@ export default function App() {
   const [englishSearch, setEnglishSearch] = useState('');
   const [englishOnlyInteresting, setEnglishOnlyInteresting] = useState(false);
   const [englishShowAllSolutions, setEnglishShowAllSolutions] = useState(false);
-  const [englishOpenId, setEnglishOpenId] = useState<string | null>(null);
+  const [englishOpenId, setEnglishOpenId] = useState<number | null>(null);
+  const [englishQuestions, setEnglishQuestions] = useState<EnglishQuestion[]>([]);
+  const [englishTotal, setEnglishTotal] = useState(0);
+  const [englishTotalAll, setEnglishTotalAll] = useState(0);
+  const [englishPage, setEnglishPage] = useState(0);
+  const [englishDangOptions, setEnglishDangOptions] = useState<string[]>([]);
 
   const [mGrade, setMGrade] = useState(12);
   const [scopeMode, setScopeMode] = useState<'all' | 'chapter' | 'lesson'>('all');
@@ -480,36 +509,71 @@ export default function App() {
     return p;
   }, [grade, chapter, dang, level, qtype, search]);
 
-  const englishLessons = useMemo(() => Array.from(new Set(ENGLISH_MATH_PROBLEMS.filter((p) => englishGrade === 'all' || p.grade === englishGrade).map((p) => p.lessonVi))).sort(), [englishGrade]);
-  const englishDangs = useMemo(() => Array.from(new Set(ENGLISH_MATH_PROBLEMS.filter((p) => (englishGrade === 'all' || p.grade === englishGrade) && (!englishLesson || p.lessonVi === englishLesson)).map((p) => p.dangVi))).sort(), [englishGrade, englishLesson]);
-  const englishProblems = useMemo(() => {
-    const needle = englishSearch.trim().toLowerCase();
-    return ENGLISH_MATH_PROBLEMS.filter((p) => {
-      if (englishGrade !== 'all' && p.grade !== englishGrade) return false;
-      if (englishLevel && p.level !== englishLevel) return false;
-      if (englishLesson && p.lessonVi !== englishLesson) return false;
-      if (englishDang && p.dangVi !== englishDang) return false;
-      if (englishOnlyInteresting && !p.interesting) return false;
-      if (!needle) return true;
-      const haystack = `${p.title} ${p.lesson} ${p.lessonVi} ${p.dang} ${p.dangVi} ${p.level} ${p.problem} ${p.answer} ${p.solutionEn} ${p.solutionVi} ${p.vocabulary.map((v) => `${v.term} ${v.meaning}`).join(' ')}`.toLowerCase();
-      return haystack.includes(needle);
-    });
+  const englishLessons = englishGrade === 'all' ? [...ENGLISH_LESSONS[10], ...ENGLISH_LESSONS[11], ...ENGLISH_LESSONS[12]] : ENGLISH_LESSONS[englishGrade];
+  const englishParams = useMemo(() => {
+    const p = eqParams({ grade: englishGrade === 'all' ? undefined : englishGrade, level: englishLevel || undefined, lesson_vi: englishLesson || undefined, dang_vi: englishDang || undefined, interesting: englishOnlyInteresting ? 'true' : undefined });
+    if (englishSearch.trim()) {
+      const q = englishSearch.trim().replace(/[%*,()]/g, ' ');
+      p.set('or', `(title.ilike.*${q}*,problem.ilike.*${q}*,answer.ilike.*${q}*,solution_en.ilike.*${q}*,solution_vi.ilike.*${q}*,dang.ilike.*${q}*,dang_vi.ilike.*${q}*,lesson.ilike.*${q}*,lesson_vi.ilike.*${q}*)`);
+    }
+    return p;
   }, [englishGrade, englishLevel, englishLesson, englishDang, englishOnlyInteresting, englishSearch]);
 
-  function pickRandomEnglishProblem() {
-    const pool = englishProblems.length ? englishProblems : ENGLISH_MATH_PROBLEMS;
-    const picked = pool[Math.floor(Math.random() * pool.length)];
-    if (picked) setEnglishOpenId(picked.id);
+  async function loadEnglish(nextPage = englishPage) {
+    if (!isSupabaseConfigured) return;
+    setLoading(true); setError('');
+    try {
+      const total = await supabaseCount('english_questions', englishParams);
+      setEnglishTotal(total);
+      const p = new URLSearchParams(englishParams);
+      p.set('select', '*');
+      p.set('order', 'id.asc');
+      p.set('limit', String(pageSize));
+      p.set('offset', String(nextPage * pageSize));
+      setEnglishQuestions(await supabaseGet<EnglishQuestion[]>('english_questions', p));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally { setLoading(false); }
+  }
+
+  async function loadEnglishDangs() {
+    if (!isSupabaseConfigured || !englishLesson) { setEnglishDangOptions([]); return; }
+    try {
+      const p = eqParams({ grade: englishGrade === 'all' ? undefined : englishGrade, lesson_vi: englishLesson });
+      p.set('select', 'dang_vi');
+      p.set('order', 'dang_vi.asc');
+      p.set('limit', '5000');
+      const rows = await supabaseGet<{ dang_vi: string }[]>('english_questions', p);
+      setEnglishDangOptions(Array.from(new Set(rows.map((r) => r.dang_vi))).sort());
+    } catch { setEnglishDangOptions([]); }
+  }
+
+  async function pickRandomEnglishProblem() {
+    if (!isSupabaseConfigured) return;
+    try {
+      const total = await supabaseCount('english_questions', englishParams);
+      if (!total) return;
+      const offset = Math.floor(Math.random() * total);
+      const p = new URLSearchParams(englishParams);
+      p.set('select', '*');
+      p.set('order', 'id.asc');
+      p.set('limit', '1');
+      p.set('offset', String(offset));
+      const rows = await supabaseGet<EnglishQuestion[]>('english_questions', p);
+      if (rows[0]) { setEnglishQuestions(rows); setEnglishTotal(total); setEnglishPage(0); setEnglishOpenId(rows[0].id); }
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
   }
 
   async function loadOverview() {
     if (!isSupabaseConfigured) return;
     setLoading(true); setError('');
     try {
-      const [total, theoryTotal] = await Promise.all([
+      const [total, theoryTotal, englishTotalCount] = await Promise.all([
         supabaseCount('questions', new URLSearchParams()),
         supabaseCount('theory_notes', new URLSearchParams()),
+        supabaseCount('english_questions', new URLSearchParams()),
       ]);
+      setEnglishTotalAll(englishTotalCount);
       const byGrade: Record<string, number> = {};
       const byLevel: Record<string, number> = {};
       const byType: Record<string, number> = {};
@@ -1139,6 +1203,8 @@ export default function App() {
   useEffect(() => { void loadOverview(); }, []);
   useEffect(() => { if (tab === 'bank') void loadBank(0); }, [tab]);
   useEffect(() => { if (tab === 'theory') void loadTheory(); }, [tab, theoryGrade]);
+  useEffect(() => { if (tab === 'english') { setEnglishPage(0); void loadEnglish(0); } }, [tab, englishParams]);
+  useEffect(() => { if (tab === 'english') void loadEnglishDangs(); }, [tab, englishGrade, englishLesson]);
   useEffect(() => { if (session) void loadTeacherData(); }, [session]);
   useEffect(() => { if (tab === 'results' && session) void loadSubmissions(); }, [tab, session]);
   useEffect(() => { if (tab === 'matrix') void loadScopes(); }, [tab, mGrade]);
@@ -1233,7 +1299,7 @@ export default function App() {
           <section className="card"><h2>Theo lớp</h2>{[10, 11, 12].map((g) => <p key={g}>Lớp {g}: <strong>{overview?.byGrade[g] ?? '—'}</strong></p>)}</section>
           <section className="card"><h2>Theo mức</h2>{LEVELS.map((l) => <p key={l}>{l}: <strong>{overview?.byLevel[l] ?? '—'}</strong></p>)}</section>
           <section className="card"><h2>Theo phần</h2>{QTYPES.map((q) => <p key={q}>{QTYPE_LABEL[q]}: <strong>{overview?.byType[q] ?? '—'}</strong></p>)}</section>
-          <section className="card"><h2>Toán tiếng Anh</h2><p className="big">{ENGLISH_MATH_PROBLEMS.length}</p><p>Bài toán THPT bằng tiếng Anh, có đáp án, lời giải Anh–Việt và từ vựng.</p><button className="primary" onClick={() => setTab('english')}>Mở mục Toán tiếng Anh</button></section>
+          <section className="card"><h2>Toán tiếng Anh</h2><p className="big">{englishTotalAll || '—'}</p><p>Bài toán THPT bằng tiếng Anh, có đáp án, lời giải Anh–Việt và từ vựng.</p><button className="primary" onClick={() => setTab('english')}>Mở mục Toán tiếng Anh</button></section>
         </main>
       )}
 
@@ -1277,29 +1343,30 @@ export default function App() {
         <main>
           <section className="card english-hero">
             <h2>Toán tiếng Anh THPT</h2>
-            <p>Bài toán bằng tiếng Anh cho lớp 10–12, có đáp án, lời giải tiếng Anh, giải thích tiếng Việt và từ vựng trọng tâm. Học sinh nên tự làm trước rồi mới mở lời giải.</p>
+            <p>Ngân hàng Toán tiếng Anh phân theo Bài, Dạng và Mức độ NB–TH–VD–VDC như Toán tiếng Việt. Mỗi câu đều có đáp án, lời giải tiếng Anh, giải thích tiếng Việt và từ vựng trọng tâm.</p>
             <div className="filters no-print">
-              <button className="primary" onClick={pickRandomEnglishProblem}>Luyện nhanh 1 bài</button>
+              <button className="primary" onClick={() => void pickRandomEnglishProblem()}>Luyện nhanh 1 câu</button>
               <label className="check"><input type="checkbox" checked={englishShowAllSolutions} onChange={(e) => setEnglishShowAllSolutions(e.target.checked)} /> Hiện tất cả lời giải</label>
-              <label className="check"><input type="checkbox" checked={englishOnlyInteresting} onChange={(e) => setEnglishOnlyInteresting(e.target.checked)} /> Chỉ câu hay</label>
+              <label className="check"><input type="checkbox" checked={englishOnlyInteresting} onChange={(e) => { setEnglishOnlyInteresting(e.target.checked); setEnglishPage(0); }} /> Chỉ câu hay</label>
             </div>
           </section>
           <section className="filters no-print">
-            <label>Lớp<select value={String(englishGrade)} onChange={(e) => setEnglishGrade(e.target.value === 'all' ? 'all' : Number(e.target.value) as 10 | 11 | 12)}><option value="all">Tất cả</option><option value="10">Lớp 10</option><option value="11">Lớp 11</option><option value="12">Lớp 12</option></select></label>
-            <label>Bài<select value={englishLesson} onChange={(e) => { setEnglishLesson(e.target.value); setEnglishDang(''); }}><option value="">Tất cả</option>{englishLessons.map((t) => <option key={t}>{t}</option>)}</select></label>
-            <label>Dạng<select value={englishDang} onChange={(e) => setEnglishDang(e.target.value)}><option value="">Tất cả</option>{englishDangs.map((t) => <option key={t}>{t}</option>)}</select></label>
-            <label>Mức độ<select value={englishLevel} onChange={(e) => setEnglishLevel(e.target.value)}><option value="">Tất cả</option><option>NB</option><option>TH</option><option>VD</option><option>VDC</option></select></label>
-            <label>Tìm kiếm<input value={englishSearch} onChange={(e) => setEnglishSearch(e.target.value)} placeholder="probability, đạo hàm, Bayes..." /></label>
+            <label>Lớp<select value={String(englishGrade)} onChange={(e) => { setEnglishGrade(e.target.value === 'all' ? 'all' : Number(e.target.value) as 10 | 11 | 12); setEnglishLesson(''); setEnglishDang(''); setEnglishPage(0); }}><option value="all">Tất cả</option><option value="10">Lớp 10</option><option value="11">Lớp 11</option><option value="12">Lớp 12</option></select></label>
+            <label>Bài<select value={englishLesson} onChange={(e) => { setEnglishLesson(e.target.value); setEnglishDang(''); setEnglishPage(0); }}><option value="">Tất cả</option>{englishLessons.map((t) => <option key={t}>{t}</option>)}</select></label>
+            <label>Dạng<select value={englishDang} onChange={(e) => { setEnglishDang(e.target.value); setEnglishPage(0); }}><option value="">{englishLesson ? 'Tất cả' : 'Chọn bài trước'}</option>{englishDangOptions.map((t) => <option key={t}>{t}</option>)}</select></label>
+            <label>Mức độ<select value={englishLevel} onChange={(e) => { setEnglishLevel(e.target.value); setEnglishPage(0); }}><option value="">Tất cả</option><option>NB</option><option>TH</option><option>VD</option><option>VDC</option></select></label>
+            <label>Tìm kiếm<input value={englishSearch} onChange={(e) => { setEnglishSearch(e.target.value); setEnglishPage(0); }} placeholder="probability, đạo hàm, Bayes..." /></label>
           </section>
-          <p className="muted">Có {englishProblems.length} bài khớp bộ lọc · Tổng {ENGLISH_MATH_PROBLEMS.length} bài · Câu hay: {ENGLISH_MATH_PROBLEMS.filter((p) => p.interesting).length}</p>
-          {englishProblems.map((p) => {
+          <p className="muted">Có {englishTotal} câu khớp bộ lọc · Tổng kho Toán tiếng Anh: {englishTotalAll || englishTotal} câu · Trang {englishPage + 1}</p>
+          {englishQuestions.map((p) => {
             const open = englishShowAllSolutions || englishOpenId === p.id;
             return (
               <article className="card english-card" key={p.id}>
-                <p className="meta">Grade {p.grade} · Bài: {p.lessonVi} ({p.lesson}) · Dạng: {p.dangVi} ({p.dang}) · Mức: {p.level}{p.interesting ? ' · Câu hay' : ''}</p>
+                <p className="meta">ID {p.id} · Grade {p.grade} · Bài: {p.lesson_vi} ({p.lesson}) · Dạng: {p.dang_vi} ({p.dang}) · Mức: {p.level} · {QTYPE_LABEL[p.qtype]}{p.interesting ? ' · Câu hay' : ''}</p>
                 <h2>{p.title}</h2>
                 <div className="content"><MathText text={p.problem} /></div>
-                <div className="vocab-row">{p.vocabulary.map((v) => <span className="vocab-chip" key={v.term}><strong>{v.term}</strong>: {v.meaning}</span>)}</div>
+                {p.options?.length > 0 && <ol className={`options-grid cols-${optionLayout(p.options)}`}>{p.options.map((op, i) => <li key={i}><MathText text={`${'ABCD'[i]}. ${stripOptionPrefix(op)}`} /></li>)}</ol>}
+                <div className="vocab-row">{(p.vocabulary ?? []).map((v) => <span className="vocab-chip" key={v.term}><strong>{v.term}</strong>: {v.meaning}</span>)}</div>
                 <div className="filters no-print">
                   <button className={open ? '' : 'primary'} onClick={() => setEnglishOpenId(open && !englishShowAllSolutions ? null : p.id)}>{open ? 'Ẩn lời giải' : 'Xem đáp án & lời giải'}</button>
                 </div>
@@ -1307,15 +1374,19 @@ export default function App() {
                   <div className="answer">
                     <p><strong>Answer:</strong> <MathText text={p.answer} /></p>
                     <div className="solution-grid">
-                      <div><h3>Solution</h3><div className="content"><MathText text={p.solutionEn} /></div></div>
-                      <div><h3>Giải thích tiếng Việt</h3><div className="content"><MathText text={p.solutionVi} /></div></div>
+                      <div><h3>Solution</h3><div className="content"><MathText text={p.solution_en} /></div></div>
+                      <div><h3>Giải thích tiếng Việt</h3><div className="content"><MathText text={p.solution_vi} /></div></div>
                     </div>
                   </div>
                 )}
               </article>
             );
           })}
-          {englishProblems.length === 0 && <section className="notice">Chưa có bài khớp bộ lọc. Thầy đổi lớp/chủ đề hoặc xóa từ khóa tìm kiếm nhé.</section>}
+          {englishQuestions.length === 0 && <section className="notice">Chưa có câu khớp bộ lọc. Thầy đổi lớp/bài/dạng/mức hoặc xóa từ khóa tìm kiếm nhé.</section>}
+          <div className="pager no-print">
+            <button disabled={englishPage <= 0} onClick={() => { const pg = englishPage - 1; setEnglishPage(pg); void loadEnglish(pg); }}>Trang trước</button>
+            <button disabled={(englishPage + 1) * pageSize >= englishTotal} onClick={() => { const pg = englishPage + 1; setEnglishPage(pg); void loadEnglish(pg); }}>Trang sau</button>
+          </div>
         </main>
       )}
 
