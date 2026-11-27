@@ -41,6 +41,8 @@ interface Profile {
   created_at: string;
 }
 
+interface EnglishVocabulary { id: string; grade: number; lesson: string; lesson_vi: string; term: string; meaning: string; freq: number; }
+
 const ENGLISH_LESSONS: Record<number, string[]> = {
   10: ['Mệnh đề','Tập hợp','Các phép toán trên tập hợp','Bất phương trình bậc nhất hai ẩn','Hệ bất phương trình bậc nhất hai ẩn','Giá trị lượng giác của một góc từ 0° đến 180°','Hệ thức lượng trong tam giác','Các khái niệm mở đầu','Tổng và hiệu của hai vectơ','Tích của một vectơ với một số','Vectơ trong mặt phẳng tọa độ','Tích vô hướng của hai vectơ','Số gần đúng và sai số','Các số đặc trưng đo xu thế trung tâm','Các số đặc trưng đo độ phân tán','Hàm số','Hàm số bậc hai','Dấu của tam thức bậc hai','Phương trình quy về phương trình bậc hai','Phương trình đường thẳng','Vị trí tương đối giữa hai đường thẳng. Góc và khoảng cách','Đường tròn trong mặt phẳng tọa độ','Ba đường conic','Quy tắc đếm','Hoán vị, chỉnh hợp và tổ hợp','Nhị thức Newton','Biến cố và định nghĩa cổ điển của xác suất','Thực hành tính xác suất theo định nghĩa cổ điển','Hệ phương trình bậc nhất ba ẩn','Phương pháp quy nạp toán học. Nhị thức Newton','Ba đường conic và ứng dụng'],
   11: ['Giá trị lượng giác của góc lượng giác','Công thức lượng giác','Hàm số lượng giác','Phương trình lượng giác','Dãy số','Cấp số cộng','Cấp số nhân','Mẫu số liệu ghép nhóm','Các số đặc trưng đo xu thế trung tâm cho mẫu số liệu ghép nhóm','Đường thẳng và mặt phẳng trong không gian','Hai đường thẳng song song','Đường thẳng song song với mặt phẳng','Hai mặt phẳng song song','Phép chiếu song song','Giới hạn của dãy số','Giới hạn của hàm số','Hàm số liên tục','Lũy thừa với số mũ thực','Lôgarit','Hàm số mũ và hàm số lôgarit','Phương trình, bất phương trình mũ và lôgarit','Hai đường thẳng vuông góc','Đường thẳng vuông góc với mặt phẳng','Phép chiếu vuông góc. Góc giữa đường thẳng và mặt phẳng','Hai mặt phẳng vuông góc','Khoảng cách','Thể tích','Biến cố hợp, biến cố giao, biến cố độc lập','Công thức cộng xác suất','Công thức nhân xác suất cho hai biến cố độc lập','Định nghĩa và ý nghĩa của đạo hàm','Các quy tắc tính đạo hàm','Đạo hàm cấp hai','Phép biến hình trong mặt phẳng','Làm quen với một vài khái niệm của lí thuyết đồ thị','Một số yếu tố vẽ kĩ thuật'],
@@ -462,6 +464,11 @@ export default function App() {
   const [englishTotalAll, setEnglishTotalAll] = useState(0);
   const [englishPage, setEnglishPage] = useState(0);
   const [englishDangOptions, setEnglishDangOptions] = useState<string[]>([]);
+  const [englishMode, setEnglishMode] = useState<'problems' | 'vocab'>('problems');
+  const [vocabRows, setVocabRows] = useState<EnglishVocabulary[]>([]);
+  const [vocabTotal, setVocabTotal] = useState(0);
+  const [vocabPage, setVocabPage] = useState(0);
+  const [mastered, setMastered] = useState<Set<string>>(() => { try { return new Set(JSON.parse(localStorage.getItem('english-vocab-mastered') ?? '[]') as string[]); } catch { return new Set(); } });
 
   const [mGrade, setMGrade] = useState(12);
   const [scopeMode, setScopeMode] = useState<'all' | 'chapter' | 'lesson'>('all');
@@ -570,6 +577,22 @@ export default function App() {
     if (!session?.user?.id) return;
     await updateProfile(session.user.id, { english_requested: true });
     setMatrixMsg('Đã gửi yêu cầu cấp quyền Toán tiếng Anh tới quản trị.');
+  }
+
+  async function loadVocab(nextPage = vocabPage) {
+    if (!isSupabaseConfigured || !hasEnglish) return;
+    setLoading(true); setError('');
+    try {
+      const p = eqParams({ grade: englishGrade === 'all' ? undefined : englishGrade, lesson_vi: englishLesson || undefined });
+      if (englishSearch.trim()) { const q = englishSearch.trim().replace(/[%*,()]/g, ' '); p.set('or', `(term.ilike.*${q}*,meaning.ilike.*${q}*,lesson_vi.ilike.*${q}*)`); }
+      setVocabTotal(await supabaseCount('english_vocabulary', p, true));
+      p.set('select', '*'); p.set('order', 'freq.desc,term.asc'); p.set('limit', String(pageSize)); p.set('offset', String(nextPage * pageSize));
+      setVocabRows(await supabaseGet<EnglishVocabulary[]>('english_vocabulary', p, true));
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setLoading(false); }
+  }
+
+  function toggleMastered(id: string) {
+    setMastered((prev) => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); localStorage.setItem('english-vocab-mastered', JSON.stringify(Array.from(next))); return next; });
   }
 
   async function loadEnglish(nextPage = englishPage) {
@@ -1256,7 +1279,8 @@ export default function App() {
   useEffect(() => { void loadOverview(); }, []);
   useEffect(() => { if (tab === 'bank') void loadBank(0); }, [tab]);
   useEffect(() => { if (tab === 'theory') void loadTheory(); }, [tab, theoryGrade]);
-  useEffect(() => { if (tab === 'english' && hasEnglish) { setEnglishPage(0); void loadEnglish(0); } }, [tab, englishParams, hasEnglish]);
+  useEffect(() => { if (tab === 'english' && hasEnglish && englishMode === 'problems') { setEnglishPage(0); void loadEnglish(0); } }, [tab, englishParams, hasEnglish, englishMode]);
+  useEffect(() => { if (tab === 'english' && hasEnglish && englishMode === 'vocab') { setVocabPage(0); void loadVocab(0); } }, [tab, hasEnglish, englishMode, englishGrade, englishLesson, englishSearch]);
   useEffect(() => { if (tab === 'english') void loadEnglishDangs(); }, [tab, englishGrade, englishLesson]);
   useEffect(() => { if (session) { void loadProfile(); } else setProfile(null); }, [session]);
   useEffect(() => { if (session && canTeach) void loadTeacherData(); }, [session, canTeach]);
@@ -1405,7 +1429,7 @@ export default function App() {
             <h2>Toán tiếng Anh THPT</h2>
             <p>Ngân hàng Toán tiếng Anh phân theo Bài, Dạng và Mức độ NB–TH–VD–VDC như Toán tiếng Việt. Mỗi câu đều có đáp án, lời giải tiếng Anh, giải thích tiếng Việt và từ vựng trọng tâm.</p>
             <div className="filters no-print">
-              <button className="primary" onClick={() => void pickRandomEnglishProblem()}>Luyện nhanh 1 câu</button>
+              <button className={englishMode === 'problems' ? 'primary' : ''} onClick={() => setEnglishMode('problems')}>Bài tập</button><button className={englishMode === 'vocab' ? 'primary' : ''} onClick={() => setEnglishMode('vocab')}>Từ vựng bắt buộc</button><button className="primary" onClick={() => void pickRandomEnglishProblem()}>Luyện nhanh 1 câu</button>
               <label className="check"><input type="checkbox" checked={englishShowAllSolutions} onChange={(e) => setEnglishShowAllSolutions(e.target.checked)} /> Hiện tất cả lời giải</label>
               <label className="check"><input type="checkbox" checked={englishOnlyInteresting} onChange={(e) => { setEnglishOnlyInteresting(e.target.checked); setEnglishPage(0); }} /> Chỉ câu hay</label>
             </div>
@@ -1418,7 +1442,19 @@ export default function App() {
             <label>Tìm kiếm<input value={englishSearch} onChange={(e) => { setEnglishSearch(e.target.value); setEnglishPage(0); }} placeholder="probability, đạo hàm, Bayes..." /></label>
           </section>
           <p className="muted">Có {englishTotal} câu khớp bộ lọc · Tổng kho Toán tiếng Anh: {englishTotalAll || englishTotal} câu · Trang {englishPage + 1}</p>
-          {englishQuestions.map((p) => {
+          {englishMode === 'vocab' && (<>
+            <p className="muted">Từ vựng tiếng Anh bắt buộc phải nắm: {vocabTotal} mục · Đã nắm {vocabRows.filter((v) => mastered.has(v.id)).length}/{vocabRows.length} mục trang này · Trang {vocabPage + 1}</p>
+            {vocabRows.map((v) => (
+              <article className="card english-card" key={v.id}>
+                <p className="meta">Grade {v.grade} · Bài: {v.lesson_vi} ({v.lesson}) · Gặp trong {v.freq} câu</p>
+                <h2>{v.term}</h2><p><strong>Nghĩa:</strong> {v.meaning}</p>
+                <label className="check"><input type="checkbox" checked={mastered.has(v.id)} onChange={() => toggleMastered(v.id)} /> Đã nắm từ này</label>
+              </article>
+            ))}
+            {vocabRows.length === 0 && <section className="notice">Chưa có từ vựng khớp bộ lọc.</section>}
+            <div className="pager no-print"><button disabled={vocabPage <= 0} onClick={() => { const pg = vocabPage - 1; setVocabPage(pg); void loadVocab(pg); }}>Trang trước</button><button disabled={(vocabPage + 1) * pageSize >= vocabTotal} onClick={() => { const pg = vocabPage + 1; setVocabPage(pg); void loadVocab(pg); }}>Trang sau</button></div>
+          </>)}
+          {englishMode === 'problems' && englishQuestions.map((p) => {
             const open = englishShowAllSolutions || englishOpenId === p.id;
             return (
               <article className="card english-card" key={p.id}>
@@ -1442,11 +1478,11 @@ export default function App() {
               </article>
             );
           })}
-          {englishQuestions.length === 0 && <section className="notice">Chưa có câu khớp bộ lọc. Thầy đổi lớp/bài/dạng/mức hoặc xóa từ khóa tìm kiếm nhé.</section>}
-          <div className="pager no-print">
+          {englishMode === 'problems' && englishQuestions.length === 0 && <section className="notice">Chưa có câu khớp bộ lọc. Thầy đổi lớp/bài/dạng/mức hoặc xóa từ khóa tìm kiếm nhé.</section>}
+          {englishMode === 'problems' && <div className="pager no-print">
             <button disabled={englishPage <= 0} onClick={() => { const pg = englishPage - 1; setEnglishPage(pg); void loadEnglish(pg); }}>Trang trước</button>
             <button disabled={(englishPage + 1) * pageSize >= englishTotal} onClick={() => { const pg = englishPage + 1; setEnglishPage(pg); void loadEnglish(pg); }}>Trang sau</button>
-          </div>
+          </div>}
         </main>
       )}
 
