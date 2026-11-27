@@ -380,6 +380,17 @@ function buildCellCounts(
   return out;
 }
 
+function AppClock() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const pad = (v: number) => String(v).padStart(2, '0');
+  const weekdays = ['Chủ nhật', 'Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy'];
+  return <p className="app-clock">🕒 {weekdays[now.getDay()]}, ngày {pad(now.getDate())} tháng {pad(now.getMonth() + 1)} năm {now.getFullYear()} · {pad(now.getHours())}:{pad(now.getMinutes())}:{pad(now.getSeconds())}</p>;
+}
+
 export default function App() {
   const [tab, setTab] = useState<Tab>('overview');
   const [error, setError] = useState('');
@@ -1101,6 +1112,7 @@ export default function App() {
         <div>
           <h1>Toán THPT Thầy Đôi</h1>
           <p>Ngân hàng câu hỏi, lý thuyết và ma trận đề Toán THPT</p>
+          <AppClock />
           <button className="install-btn" onClick={() => void installApp()}>📲 Cài ứng dụng</button>
         </div>
         <nav>
