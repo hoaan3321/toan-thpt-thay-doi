@@ -26,7 +26,7 @@ function systemPrompt(context) {
 }
 
 async function callOpenAICompatible({ url, key, model, messages, context }) {
-  const res = await fetch(url, {
+  const res = await fetch(url, { signal: AbortSignal.timeout(15000),
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
     body: JSON.stringify({
@@ -43,7 +43,7 @@ async function callOpenAICompatible({ url, key, model, messages, context }) {
 
 async function callGemini({ key, model, messages, context }) {
   const contents = messages.map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }));
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, { signal: AbortSignal.timeout(15000),
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
     body: JSON.stringify({
@@ -93,13 +93,13 @@ export default async function handler(req, res) {
     try {
       let text = '';
       if (p === 'groq') {
-        text = await callOpenAICompatible({
-          url: 'https://api.groq.com/openai/v1/chat/completions',
-          key: process.env.GROQ_API_KEY,
-          model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
-          messages,
-          context,
-        });
+        const groqModels = [...new Set([process.env.GROQ_MODEL, 'llama-3.3-70b-versatile', 'llama-3.1-8b-instant'].filter(Boolean))];
+        const groqErrors = [];
+        for (const gm of groqModels) {
+          try { text = await callOpenAICompatible({ url: 'https://api.groq.com/openai/v1/chat/completions', key: process.env.GROQ_API_KEY, model: gm, messages, context }); if (text.trim()) break; }
+          catch (e) { groqErrors.push(`${gm}: ${e instanceof Error ? e.message : String(e)}`); }
+        }
+        if (!text.trim() && groqErrors.length) throw new Error(groqErrors.join('; '));
       } else if (p === 'cerebras') {
         text = await callOpenAICompatible({ url: 'https://api.cerebras.ai/v1/chat/completions', key: process.env.CEREBRAS_API_KEY, model: process.env.CEREBRAS_MODEL || 'gpt-oss-120b', messages, context });
       } else if (p === 'sambanova') {
@@ -107,7 +107,7 @@ export default async function handler(req, res) {
       } else if (p === 'cloudflare') {
         text = await callOpenAICompatible({ url: `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/ai/v1/chat/completions`, key: process.env.CLOUDFLARE_API_TOKEN, model: process.env.CLOUDFLARE_MODEL || '@cf/google/gemma-4-26b-a4b-it', messages, context });
       } else if (p === 'gemini') {
-        const models = [...new Set([process.env.GEMINI_MODEL, 'gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-3.8-flash', 'gemini-flash-lite-latest'].filter(Boolean))];
+        const models = [...new Set([process.env.GEMINI_MODEL, 'gemini-flash-lite-latest', 'gemini-3.5-flash-lite', 'gemini-3.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-3.8-flash'].filter(Boolean))];
         const modelErrors = [];
         for (const model of models) {
           try {
