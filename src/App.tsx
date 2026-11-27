@@ -1807,6 +1807,13 @@ export default function App() {
             <p>Tin và văn bản từ nguồn chính thức của Bộ Giáo dục và Đào tạo. Bấm vào từng mục để mở trang gốc.</p>
             <div className="filters"><label>Tìm tin<input value={newsQuery} onChange={(e) => setNewsQuery(e.target.value)} placeholder="Ví dụ: công văn, thi tốt nghiệp, trung học" /></label></div>
           </section>
+          <section className="card"><h3>Tóm tắt nguồn tin chính thống</h3>
+            <p>Toàn bộ tin trong mục này lấy từ <strong>Cổng thông tin điện tử Bộ Giáo dục và Đào tạo (moet.gov.vn)</strong> — nguồn chính thống của Bộ. Ba nguồn chính:</p>
+            <p>• <strong>Tin tức Bộ GD&ĐT:</strong> tin hoạt động của Bộ, thông cáo báo chí, tin tổng hợp giáo dục.</p>
+            <p>• <strong>Giáo dục trung học:</strong> tin và văn bản bậc trung học, sách giáo khoa, dạy thêm học thêm.</p>
+            <p>• <strong>Chính sách và thi tốt nghiệp THPT:</strong> dự thảo quy chế thi, chính sách đột phá phát triển giáo dục.</p>
+            <p>Mỗi tin bên dưới đều có tóm tắt ngắn và nút mở trang gốc của Bộ để thầy xem văn bản đầy đủ.</p>
+          </section>
           <section className="card"><h3>Nguồn chính thức</h3>
             {NEWS_SOURCES.map((n) => (<p key={n.url}><a href={n.url} target="_blank" rel="noreferrer"><strong>{n.title}</strong></a> — {n.desc}</p>))}
           </section>
