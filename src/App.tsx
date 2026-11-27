@@ -3,7 +3,7 @@ import MathText from './MathText';
 import { eqParams, getSession, ilike, isSupabaseConfigured, signIn, signOut, signUp, supabaseCount, supabaseDelete, supabaseGet, supabaseInsert, supabaseUpdate, type AuthSession } from './supabase';
 import { LEVELS, QTYPES, QTYPE_LABEL, type Assignment, type ClassRecord, type ExamRecord, type Level, type QType, type Question, type StudentRecord, type Submission, type TheoryNote } from './types';
 
-type Tab = 'overview' | 'bank' | 'theory' | 'english' | 'matrix' | 'print' | 'assign' | 'take' | 'results' | 'admin';
+type Tab = 'overview' | 'bank' | 'theory' | 'english' | 'matrix' | 'print' | 'assign' | 'take' | 'results' | 'admin' | 'users';
 
 interface GeneratedCode {
   code: number;
@@ -488,6 +488,8 @@ export default function App() {
   const [authRole, setAuthRole] = useState<'student' | 'teacher'>('student');
   const [profile, setProfile] = useState<Profile | null>(null);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [userSearch, setUserSearch] = useState('');
+  const [userFilter, setUserFilter] = useState<'all' | 'student' | 'teacher' | 'trial' | 'full' | 'english' | 'requested' | 'limited'>('all');
   const [examTitle, setExamTitle] = useState('Đề Toán THPT');
   const [duration, setDuration] = useState(45);
   const [classes, setClasses] = useState<ClassRecord[]>([]);
@@ -1293,7 +1295,7 @@ export default function App() {
   useEffect(() => { if (tab === 'english') void loadEnglishDangs(); }, [tab, englishGrade, englishLesson]);
   useEffect(() => { if (session) { void loadProfile(); } else setProfile(null); }, [session]);
   useEffect(() => { if (session && canTeach) void loadTeacherData(); }, [session, canTeach]);
-  useEffect(() => { if (tab === 'admin' && isAdmin) void loadProfiles(); }, [tab, isAdmin]);
+  useEffect(() => { if ((tab === 'admin' || tab === 'users') && isAdmin) void loadProfiles(); }, [tab, isAdmin]);
   useEffect(() => { if (tab === 'results' && session) void loadSubmissions(); }, [tab, session]);
   useEffect(() => { if (tab === 'matrix') void loadScopes(); }, [tab, mGrade]);
   useEffect(() => {
@@ -1366,7 +1368,7 @@ export default function App() {
           <button className="install-btn" onClick={() => void installApp()}>📲 Cài ứng dụng</button>
         </div>
         <nav>
-          {([['overview', 'Tổng quan'], ['bank', 'Ngân hàng câu hỏi'], ['theory', 'Lý thuyết'], ['english', 'Toán tiếng Anh'], ['matrix', 'Tạo đề'], ['print', 'In đề'], ['assign', 'Giao bài'], ['take', 'Học sinh làm bài'], ['results', 'Kết quả'], ['admin', 'Quản trị']] as [Tab, string][]).map(([t, label]) => (
+          {([['overview', 'Tổng quan'], ['bank', 'Ngân hàng câu hỏi'], ['theory', 'Lý thuyết'], ['english', 'Toán tiếng Anh'], ['matrix', 'Tạo đề'], ['print', 'In đề'], ['assign', 'Giao bài'], ['take', 'Học sinh làm bài'], ['results', 'Kết quả'], ['admin', 'Quản trị'], ...(isAdmin ? [['users', 'Quản lý người dùng'] as [Tab, string]] : [])] as [Tab, string][]).map(([t, label]) => (
             <button key={t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)}>{label}</button>
           ))}
         </nav>
@@ -1667,16 +1669,53 @@ export default function App() {
         </main>
       )}
 
+      {tab === 'users' && (
+        <main>
+          {!isAdmin ? <section className="card"><h2>Quản lý người dùng</h2><p>Chỉ quản trị mới vào được mục này.</p></section> : (<>
+          <section className="card"><h2>Quản lý người dùng</h2>
+            <p>Tổng {profiles.length} tài khoản · Đang dùng thử {profiles.filter((pr) => new Date(pr.trial_ends_at).getTime() > Date.now() && !pr.full_access).length} · Full {profiles.filter((pr) => pr.full_access || pr.role === 'admin').length} · Yêu cầu tiếng Anh {profiles.filter((pr) => pr.english_requested).length}</p>
+            <div className="filters">
+              <label>Tìm email<input value={userSearch} onChange={(e) => setUserSearch(e.target.value)} placeholder="Nhập email…" /></label>
+              <label>Lọc<select value={userFilter} onChange={(e) => setUserFilter(e.target.value as typeof userFilter)}><option value="all">Tất cả</option><option value="student">Học sinh</option><option value="teacher">Giáo viên</option><option value="trial">Đang dùng thử</option><option value="full">Full</option><option value="english">Có tiếng Anh</option><option value="requested">Đang yêu cầu tiếng Anh</option><option value="limited">Giới hạn</option></select></label>
+              <button onClick={() => void loadProfiles()}>Tải lại</button>
+            </div>
+          </section>
+          {profiles.filter((pr) => {
+            const trial = new Date(pr.trial_ends_at).getTime() > Date.now();
+            const full = pr.full_access || pr.role === 'admin';
+            const eng = pr.english_access || full || trial;
+            if (userSearch.trim() && !pr.email.toLowerCase().includes(userSearch.trim().toLowerCase())) return false;
+            if (userFilter === 'student') return pr.role === 'student';
+            if (userFilter === 'teacher') return pr.role === 'teacher';
+            if (userFilter === 'trial') return trial && !full;
+            if (userFilter === 'full') return full;
+            if (userFilter === 'english') return eng;
+            if (userFilter === 'requested') return pr.english_requested;
+            if (userFilter === 'limited') return !full && !trial;
+            return true;
+          }).map((pr) => {
+            const trial = new Date(pr.trial_ends_at).getTime() > Date.now();
+            return (
+            <section className="card" key={pr.user_id}>
+              <p><strong>{pr.email}</strong> · {pr.role === 'admin' ? 'Quản trị' : pr.role === 'teacher' ? 'Giáo viên' : 'Học sinh'}</p>
+              <p className="muted">Đăng ký {new Date(pr.created_at).toLocaleDateString('vi-VN')} · {pr.full_access || pr.role === 'admin' ? 'Full tính năng' : trial ? `Dùng thử đến ${new Date(pr.trial_ends_at).toLocaleDateString('vi-VN')}` : 'Giới hạn'} · Tiếng Anh: {pr.english_access || pr.full_access || pr.role === 'admin' ? 'Có' : pr.english_requested ? 'Đang yêu cầu' : 'Chưa'}</p>
+              {pr.role !== 'admin' && <div className="filters">
+                <button onClick={() => void updateProfile(pr.user_id, { full_access: !pr.full_access })}>{pr.full_access ? 'Thu hồi full' : 'Cấp full'}</button>
+                <button onClick={() => void updateProfile(pr.user_id, { english_access: !pr.english_access, english_requested: false })}>{pr.english_access ? 'Thu hồi tiếng Anh' : 'Cấp tiếng Anh'}</button>
+                <button onClick={() => void updateProfile(pr.user_id, { role: pr.role === 'teacher' ? 'student' : 'teacher' })}>Đổi vai trò</button>
+                <button onClick={() => void updateProfile(pr.user_id, { trial_ends_at: new Date(Date.now() + 7 * 86400000).toISOString() })}>Gia hạn 7 ngày</button>
+                <button onClick={() => void updateProfile(pr.user_id, { trial_ends_at: new Date(Date.now() + 30 * 86400000).toISOString() })}>Gia hạn 30 ngày</button>
+                <button onClick={() => void updateProfile(pr.user_id, { full_access: false, english_access: false, trial_ends_at: new Date(Date.now() - 1000).toISOString() })}>Khóa tài khoản</button>
+              </div>}
+            </section>);
+          })}
+          </>)}
+        </main>
+      )}
+
       {tab === 'admin' && (
         <main className="card no-print">
-          {isAdmin && (
-            <section><h2>Quản trị tài khoản</h2><p>Quản trị nắm mọi quyền: cấp/thu hồi full tính năng, cấp quyền Toán tiếng Anh, đổi vai trò và gia hạn dùng thử.</p>
-            {profiles.map((pr) => (
-              <div className="filters" key={pr.user_id}><strong>{pr.email}</strong><span>{pr.role === 'admin' ? 'Quản trị' : pr.role === 'teacher' ? 'Giáo viên' : 'Học sinh'} · {pr.full_access ? 'Full' : new Date(pr.trial_ends_at).getTime() > Date.now() ? `Dùng thử đến ${new Date(pr.trial_ends_at).toLocaleDateString('vi-VN')}` : 'Giới hạn'} · Tiếng Anh: {pr.english_access || pr.full_access || pr.role === 'admin' ? 'Có' : pr.english_requested ? 'Đang yêu cầu' : 'Chưa'}</span>
-              {pr.role !== 'admin' && <><button onClick={() => void updateProfile(pr.user_id, { full_access: !pr.full_access })}>{pr.full_access ? 'Thu hồi full' : 'Cấp full'}</button><button onClick={() => void updateProfile(pr.user_id, { english_access: !pr.english_access, english_requested: false })}>{pr.english_access ? 'Thu hồi tiếng Anh' : 'Cấp tiếng Anh'}</button><button onClick={() => void updateProfile(pr.user_id, { role: pr.role === 'teacher' ? 'student' : 'teacher' })}>Đổi vai trò</button><button onClick={() => void updateProfile(pr.user_id, { trial_ends_at: new Date(Date.now() + 3 * 86400000).toISOString() })}>Gia hạn 3 ngày</button></>}
-              </div>
-            ))}</section>
-          )}
+          {isAdmin && <p className="notice">Quản lý tài khoản ở mục <button onClick={() => setTab('users')}>Quản lý người dùng</button>.</p>}
           <h2>Quản trị câu hỏi</h2>
           {!canTeach && <p className="notice">Tính năng này dành cho giáo viên đã được cấp full tính năng (hoặc đang dùng thử 3 ngày).</p>}
           <div className="filters">
