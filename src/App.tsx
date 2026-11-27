@@ -29,6 +29,22 @@ function stripOptionPrefix(s: string): string {
   return s.replace(/^\s*[A-D][.)]\s*/i, '').trim();
 }
 
+function stripSourcePrefix(s: string): string {
+  return String(s ?? '').replace(/^\s*\[[^\]]{3,160}\]\s*/, '').trim();
+}
+
+function plainTextLen(s: string): number {
+  return String(s ?? '').replace(/\\[a-zA-Z]+/g, 'x').replace(/[$\\{}^_]/g, '').trim().length;
+}
+
+function optionLayout(options: string[]): 4 | 2 | 1 {
+  const lens = options.map((op) => plainTextLen(stripOptionPrefix(op)));
+  const total = lens.reduce((a, b) => a + b, 0);
+  if (options.length === 4 && Math.max(...lens) <= 14 && total <= 44) return 4;
+  if (options.length >= 2 && Math.max(...lens) <= 30 && total <= 96) return 2;
+  return 1;
+}
+
 function fmtPoints(n: number): string {
   const v = Math.round(Number(n || 0) * 1000) / 1000;
   return String(v).replace('.', ',');
@@ -906,8 +922,12 @@ export default function App() {
         if (!qs.length) continue;
         body.push(para(`${QTYPE_LABEL[qt]} (${fmtPoints(partPointsOf(qs))} điểm)`, { bold: true, before: 120, after: 80 }));
         qs.forEach((q, i) => {
-          body.push(para(`Câu ${i + 1}. ${q.content}`, { after: 40, rich: true }));
-          (q.options ?? []).forEach((op, oi) => body.push(para(`${'ABCD'[oi] ?? oi + 1}. ${op}`, { indent: 360, after: 20, rich: true })));
+          body.push(para(`Câu ${i + 1}. ${stripSourcePrefix(q.content)}`, { after: 40, rich: true }));
+          const docxOpts = (q.options ?? []).map((op, oi) => `${'ABCD'[oi] ?? oi + 1}. ${stripOptionPrefix(op)}`);
+          const docxLayout = optionLayout(q.options ?? []);
+          if (docxLayout === 4) body.push(para(docxOpts.join('        '), { indent: 360, after: 20, rich: true }));
+          else if (docxLayout === 2) { body.push(para(docxOpts.slice(0, 2).join('        '), { indent: 360, after: 20, rich: true })); body.push(para(docxOpts.slice(2).join('        '), { indent: 360, after: 20, rich: true })); }
+          else docxOpts.forEach((op) => body.push(para(op, { indent: 360, after: 20, rich: true })));
           if (kind === 'dapan') {
             body.push(para(`Đáp án: ${q.correct}`, { bold: true, indent: 360, after: 20, rich: true }));
             if (q.explanation) body.push(para(q.explanation, { indent: 360, after: 80, rich: true }));
@@ -950,11 +970,13 @@ export default function App() {
         if (!qs.length) continue;
         lines.push(`\\textbf{${QTYPE_LABEL[qt]} (${fmtPoints(partPointsOf(qs))} điểm)}`);
         qs.forEach((q, i) => {
-          lines.push(`\\textbf{Câu ${i + 1}.} ${q.content}`);
+          lines.push(`\\textbf{Câu ${i + 1}.} ${stripSourcePrefix(q.content)}`);
           if (q.options?.length) {
-            lines.push('\\begin{enumerate}[label=\\Alph*.,leftmargin=*]');
-            q.options.forEach((op) => lines.push(`\\item ${op}`));
-            lines.push('\\end{enumerate}');
+            const texOpts = q.options.map((op, oi) => `\\textbf{${'ABCD'[oi] ?? oi + 1}.} ${stripOptionPrefix(op)}`);
+            const texLayout = optionLayout(q.options);
+            if (texLayout === 4) lines.push(texOpts.join(' \\qquad '));
+            else if (texLayout === 2) { lines.push(texOpts.slice(0, 2).join(' \\qquad ')); lines.push(texOpts.slice(2).join(' \\qquad ')); }
+            else texOpts.forEach((op) => lines.push(op));
           }
           if (kind === 'dapan') {
             lines.push(`\\textbf{Đáp án:} ${q.correct}`);
@@ -1210,8 +1232,8 @@ export default function App() {
                     <h3>{QTYPE_LABEL[qt]}</h3>
                     {qs.map((q, i) => (
                       <article className="question" key={q.id}>
-                        <p><strong>Câu {i + 1}.</strong> <MathText text={q.content} /></p>
-                        {q.options?.length > 0 && <ol className="options">{q.options.map((op, oi) => <li key={oi}><MathText text={op} /></li>)}</ol>}
+                        <p><strong>Câu {i + 1}.</strong> <MathText text={stripSourcePrefix(q.content)} /></p>
+                        {q.options?.length > 0 && <div className={`options-grid cols-${optionLayout(q.options)}`}>{q.options.map((op, oi) => <span key={oi}><strong>{'ABCD'[oi] ?? oi + 1}.</strong> <MathText text={stripOptionPrefix(op)} /></span>)}</div>}
                         {showAnswers && <div className="answer"><p><strong>Đáp án:</strong> <MathText text={q.correct} /></p><MathText text={q.explanation} /></div>}
                       </article>
                     ))}

@@ -28,6 +28,11 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .meta { color: #64748b; font-size: 13px; }
 .content { line-height: 1.65; }
 .options { line-height: 1.6; }
+.options-grid { display: grid; gap: 4px 18px; margin: 6px 0 8px 22px; line-height: 1.55; }
+.options-grid.cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.options-grid.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.options-grid.cols-1 { grid-template-columns: 1fr; }
+@media (max-width: 560px) { .options-grid.cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .answer { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 12px; margin-top: 12px; }
 .notice { background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 12px; }
 .danger { background: #fef2f2; border-color: #fecaca; }
