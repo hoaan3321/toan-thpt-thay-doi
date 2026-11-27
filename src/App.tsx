@@ -416,7 +416,8 @@ export default function App() {
 
   const [englishGrade, setEnglishGrade] = useState<'all' | 10 | 11 | 12>('all');
   const [englishLevel, setEnglishLevel] = useState('');
-  const [englishTopic, setEnglishTopic] = useState('');
+  const [englishLesson, setEnglishLesson] = useState('');
+  const [englishDang, setEnglishDang] = useState('');
   const [englishSearch, setEnglishSearch] = useState('');
   const [englishOnlyInteresting, setEnglishOnlyInteresting] = useState(false);
   const [englishShowAllSolutions, setEnglishShowAllSolutions] = useState(false);
@@ -479,19 +480,21 @@ export default function App() {
     return p;
   }, [grade, chapter, dang, level, qtype, search]);
 
-  const englishTopics = useMemo(() => Array.from(new Set(ENGLISH_MATH_PROBLEMS.map((p) => p.topic))).sort(), []);
+  const englishLessons = useMemo(() => Array.from(new Set(ENGLISH_MATH_PROBLEMS.filter((p) => englishGrade === 'all' || p.grade === englishGrade).map((p) => p.lessonVi))).sort(), [englishGrade]);
+  const englishDangs = useMemo(() => Array.from(new Set(ENGLISH_MATH_PROBLEMS.filter((p) => (englishGrade === 'all' || p.grade === englishGrade) && (!englishLesson || p.lessonVi === englishLesson)).map((p) => p.dangVi))).sort(), [englishGrade, englishLesson]);
   const englishProblems = useMemo(() => {
     const needle = englishSearch.trim().toLowerCase();
     return ENGLISH_MATH_PROBLEMS.filter((p) => {
       if (englishGrade !== 'all' && p.grade !== englishGrade) return false;
       if (englishLevel && p.level !== englishLevel) return false;
-      if (englishTopic && p.topic !== englishTopic) return false;
+      if (englishLesson && p.lessonVi !== englishLesson) return false;
+      if (englishDang && p.dangVi !== englishDang) return false;
       if (englishOnlyInteresting && !p.interesting) return false;
       if (!needle) return true;
-      const haystack = `${p.title} ${p.topic} ${p.topicVi} ${p.problem} ${p.answer} ${p.solutionEn} ${p.solutionVi} ${p.vocabulary.map((v) => `${v.term} ${v.meaning}`).join(' ')}`.toLowerCase();
+      const haystack = `${p.title} ${p.lesson} ${p.lessonVi} ${p.dang} ${p.dangVi} ${p.level} ${p.problem} ${p.answer} ${p.solutionEn} ${p.solutionVi} ${p.vocabulary.map((v) => `${v.term} ${v.meaning}`).join(' ')}`.toLowerCase();
       return haystack.includes(needle);
     });
-  }, [englishGrade, englishLevel, englishTopic, englishOnlyInteresting, englishSearch]);
+  }, [englishGrade, englishLevel, englishLesson, englishDang, englishOnlyInteresting, englishSearch]);
 
   function pickRandomEnglishProblem() {
     const pool = englishProblems.length ? englishProblems : ENGLISH_MATH_PROBLEMS;
@@ -1283,8 +1286,9 @@ export default function App() {
           </section>
           <section className="filters no-print">
             <label>Lớp<select value={String(englishGrade)} onChange={(e) => setEnglishGrade(e.target.value === 'all' ? 'all' : Number(e.target.value) as 10 | 11 | 12)}><option value="all">Tất cả</option><option value="10">Lớp 10</option><option value="11">Lớp 11</option><option value="12">Lớp 12</option></select></label>
-            <label>Mức<select value={englishLevel} onChange={(e) => setEnglishLevel(e.target.value)}><option value="">Tất cả</option><option>Foundation</option><option>Standard</option><option>Challenge</option></select></label>
-            <label>Chủ đề<select value={englishTopic} onChange={(e) => setEnglishTopic(e.target.value)}><option value="">Tất cả</option>{englishTopics.map((t) => <option key={t}>{t}</option>)}</select></label>
+            <label>Bài<select value={englishLesson} onChange={(e) => { setEnglishLesson(e.target.value); setEnglishDang(''); }}><option value="">Tất cả</option>{englishLessons.map((t) => <option key={t}>{t}</option>)}</select></label>
+            <label>Dạng<select value={englishDang} onChange={(e) => setEnglishDang(e.target.value)}><option value="">Tất cả</option>{englishDangs.map((t) => <option key={t}>{t}</option>)}</select></label>
+            <label>Mức độ<select value={englishLevel} onChange={(e) => setEnglishLevel(e.target.value)}><option value="">Tất cả</option><option>NB</option><option>TH</option><option>VD</option><option>VDC</option></select></label>
             <label>Tìm kiếm<input value={englishSearch} onChange={(e) => setEnglishSearch(e.target.value)} placeholder="probability, đạo hàm, Bayes..." /></label>
           </section>
           <p className="muted">Có {englishProblems.length} bài khớp bộ lọc · Tổng {ENGLISH_MATH_PROBLEMS.length} bài · Câu hay: {ENGLISH_MATH_PROBLEMS.filter((p) => p.interesting).length}</p>
@@ -1292,7 +1296,7 @@ export default function App() {
             const open = englishShowAllSolutions || englishOpenId === p.id;
             return (
               <article className="card english-card" key={p.id}>
-                <p className="meta">Grade {p.grade} · {p.topic} · {p.topicVi} · {p.level}{p.interesting ? ' · Câu hay' : ''}</p>
+                <p className="meta">Grade {p.grade} · Bài: {p.lessonVi} ({p.lesson}) · Dạng: {p.dangVi} ({p.dang}) · Mức: {p.level}{p.interesting ? ' · Câu hay' : ''}</p>
                 <h2>{p.title}</h2>
                 <div className="content"><MathText text={p.problem} /></div>
                 <div className="vocab-row">{p.vocabulary.map((v) => <span className="vocab-chip" key={v.term}><strong>{v.term}</strong>: {v.meaning}</span>)}</div>
