@@ -779,8 +779,8 @@ export default function App() {
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setLoading(false); }
   }
 
-  async function saveGeneratedAsAssignment() {
-    if (!session) { setError('Hãy đăng nhập giáo viên trước khi giao bài.'); setTab('assign'); return; }
+  async function saveGeneratedAsAssignment(assignNow = true) {
+    if (!session) { setError('Hãy đăng nhập giáo viên trước khi lưu đề.'); setTab('assign'); return; }
     if (!generated.length) { setError('Hãy sinh mã đề trước.'); return; }
     setLoading(true); setError('');
     try {
@@ -794,6 +794,11 @@ export default function App() {
         duration_minutes: duration,
       }, true);
       const exam = examRows[0];
+      if (!assignNow) {
+        await loadTeacherData();
+        setMatrixMsg(`Đã lưu đề “${exam.title}” vào mục Đề đã lưu.`);
+        return;
+      }
       const code = makeJoinCode();
       await supabaseInsert('assignments', {
         exam_id: exam.id,
@@ -808,6 +813,49 @@ export default function App() {
       setJoinCode(code);
       setMatrixMsg(`Đã giao bài. Mã vào làm bài: ${code}`);
       setTab('assign');
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setLoading(false); }
+  }
+
+  async function openSavedExam(exam: ExamRecord) {
+    setLoading(true); setError('');
+    try {
+      const loaded: GeneratedCode[] = [];
+      for (const c of exam.codes ?? []) {
+        const qs = await loadQuestionsByIds(c.questionIds ?? []);
+        loaded.push({ code: c.code, questions: qs.map((q, i) => ({ ...q, points: Number(c.questionPoints?.[i] ?? q.points ?? 0) })), rawPoints: Number(c.rawPoints ?? 10) });
+      }
+      setGenerated(loaded);
+      setMGrade(exam.grade);
+      setExamTitle(exam.title);
+      setDuration(exam.duration_minutes ?? 45);
+      setMatrixMsg(`Đã mở đề đã lưu “${exam.title}”.`);
+      setTab('print');
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setLoading(false); }
+  }
+
+  async function assignSavedExam(exam: ExamRecord) {
+    if (!session) { setError('Hãy đăng nhập giáo viên trước khi giao bài.'); return; }
+    setLoading(true); setError('');
+    try {
+      const code = makeJoinCode();
+      await supabaseInsert('assignments', { exam_id: exam.id, class_id: selectedClassId ? Number(selectedClassId) : null, join_code: code, title: exam.title, duration_minutes: exam.duration_minutes ?? duration, show_result: true, is_open: true }, true);
+      await loadTeacherData();
+      setJoinCode(code);
+      setMatrixMsg(`Đã giao đề “${exam.title}”. Mã vào làm bài: ${code}`);
+      setTab('assign');
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setLoading(false); }
+  }
+
+  async function deleteSavedExam(exam: ExamRecord) {
+    if (!window.confirm(`Xóa đề đã lưu “${exam.title}”? Bài giao và kết quả của đề này cũng sẽ bị xóa.`)) return;
+    setLoading(true); setError('');
+    try {
+      const p = eqParams({ exam_id: exam.id });
+      await supabaseDelete('assignments', p, true);
+      const ep = eqParams({ id: exam.id });
+      await supabaseDelete('exams', ep, true);
+      await loadTeacherData();
+      setMatrixMsg(`Đã xóa đề “${exam.title}”.`);
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setLoading(false); }
   }
 
@@ -1214,7 +1262,8 @@ export default function App() {
             <label>Tên đề<input value={examTitle} onChange={(e) => setExamTitle(e.target.value)} /></label>
             <label>Thời gian (phút)<input type="number" min={1} value={duration} onChange={(e) => setDuration(Math.max(1, Number(e.target.value)))} /></label>
             <label>Lớp giao bài<select value={selectedClassId} onChange={(e) => setSelectedClassId(e.target.value)}><option value="">Không gắn lớp</option>{classes.map((c) => <option key={c.id} value={c.id}>{c.name} — lớp {c.grade}</option>)}</select></label>
-            <button onClick={() => void saveGeneratedAsAssignment()}>Lưu đề & giao bài</button>
+            <button className="primary" onClick={() => void saveGeneratedAsAssignment(false)} disabled={!generated.length}>Lưu đề</button>
+            <button onClick={() => void saveGeneratedAsAssignment(true)} disabled={!generated.length}>Lưu & giao bài</button>
             <button onClick={() => exportDocx('de')} disabled={!generated.length}>Xuất đề DOCX</button>
             <button onClick={() => exportDocx('dapan')} disabled={!generated.length}>Xuất đáp án DOCX</button>
             <button onClick={() => exportPdf('de')} disabled={!generated.length}>Xuất đề PDF</button>
@@ -1223,6 +1272,22 @@ export default function App() {
             <button onClick={() => exportLatex('dapan')} disabled={!generated.length}>Xuất đáp án LaTeX</button>
           </div>
           {matrixMsg && <p className="notice">{matrixMsg}</p>}
+          <section className="card">
+            <h3>Đề đã lưu</h3>
+            {!session && <p className="muted">Đăng nhập giáo viên để lưu và xem các đề đã tạo.</p>}
+            {session && exams.length === 0 && <p className="muted">Chưa có đề nào được lưu. Sinh mã đề rồi bấm “Lưu đề” nhé.</p>}
+            {session && exams.map((ex) => (
+              <article className="question" key={ex.id}>
+                <p><strong>{ex.title}</strong> · Lớp {ex.grade} · {(ex.codes ?? []).length} mã đề · {ex.duration_minutes ?? 45} phút</p>
+                <p className="meta">{ex.scope_lesson || ex.scope_chapter || 'Toàn khối'}{ex.created_at ? ` · ${new Date(ex.created_at).toLocaleString('vi-VN')}` : ''}</p>
+                <div className="filters">
+                  <button onClick={() => void openSavedExam(ex)}>Xem / In đề</button>
+                  <button onClick={() => void assignSavedExam(ex)}>Giao bài</button>
+                  <button onClick={() => void deleteSavedExam(ex)}>Xóa</button>
+                </div>
+              </article>
+            ))}
+          </section>
         </main>
       )}
 
