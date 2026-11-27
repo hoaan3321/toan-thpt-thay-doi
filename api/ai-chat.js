@@ -22,7 +22,7 @@ function cleanMessages(messages) {
 
 function systemPrompt(context) {
   const ctx = String(context || '').slice(0, 6000);
-  return `Bạn là trợ lý AI của app Toán THPT Thầy Đôi. Trả lời bằng tiếng Việt, ngắn gọn, rõ ràng, đúng toán THPT Việt Nam. Khi có công thức, dùng LaTeX trong $...$ hoặc $$...$$. Nếu người dùng hỏi về câu hỏi/đề đang xem, hãy dựa vào ngữ cảnh sau nếu có:\n${ctx}`;
+  return `Bạn là trợ lý AI của app Toán THPT Thầy Đôi. Trả lời bằng tiếng Việt. Lời giải phải ngắn gọn, súc tích nhưng đầy đủ các bước chính, không lan man, không lặp ý; trình bày theo bước ngắn và kết luận đáp số rõ ràng. Khi có công thức, dùng LaTeX trong $...$ hoặc $$...$$. Nếu người dùng hỏi về câu hỏi/đề đang xem, hãy dựa vào ngữ cảnh sau nếu có:\n${ctx}`;
 }
 
 async function callOpenAICompatible({ url, key, model, messages, context, image }) {
