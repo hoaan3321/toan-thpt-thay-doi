@@ -30,6 +30,17 @@ interface EnglishQuestion {
   interesting: boolean;
 }
 
+interface Profile {
+  user_id: string;
+  email: string;
+  role: 'student' | 'teacher' | 'admin';
+  full_access: boolean;
+  english_access: boolean;
+  english_requested: boolean;
+  trial_ends_at: string;
+  created_at: string;
+}
+
 const ENGLISH_LESSONS: Record<number, string[]> = {
   10: ['Mệnh đề','Tập hợp','Các phép toán trên tập hợp','Bất phương trình bậc nhất hai ẩn','Hệ bất phương trình bậc nhất hai ẩn','Giá trị lượng giác của một góc từ 0° đến 180°','Hệ thức lượng trong tam giác','Các khái niệm mở đầu','Tổng và hiệu của hai vectơ','Tích của một vectơ với một số','Vectơ trong mặt phẳng tọa độ','Tích vô hướng của hai vectơ','Số gần đúng và sai số','Các số đặc trưng đo xu thế trung tâm','Các số đặc trưng đo độ phân tán','Hàm số','Hàm số bậc hai','Dấu của tam thức bậc hai','Phương trình quy về phương trình bậc hai','Phương trình đường thẳng','Vị trí tương đối giữa hai đường thẳng. Góc và khoảng cách','Đường tròn trong mặt phẳng tọa độ','Ba đường conic','Quy tắc đếm','Hoán vị, chỉnh hợp và tổ hợp','Nhị thức Newton','Biến cố và định nghĩa cổ điển của xác suất','Thực hành tính xác suất theo định nghĩa cổ điển','Hệ phương trình bậc nhất ba ẩn','Phương pháp quy nạp toán học. Nhị thức Newton','Ba đường conic và ứng dụng'],
   11: ['Giá trị lượng giác của góc lượng giác','Công thức lượng giác','Hàm số lượng giác','Phương trình lượng giác','Dãy số','Cấp số cộng','Cấp số nhân','Mẫu số liệu ghép nhóm','Các số đặc trưng đo xu thế trung tâm cho mẫu số liệu ghép nhóm','Đường thẳng và mặt phẳng trong không gian','Hai đường thẳng song song','Đường thẳng song song với mặt phẳng','Hai mặt phẳng song song','Phép chiếu song song','Giới hạn của dãy số','Giới hạn của hàm số','Hàm số liên tục','Lũy thừa với số mũ thực','Lôgarit','Hàm số mũ và hàm số lôgarit','Phương trình, bất phương trình mũ và lôgarit','Hai đường thẳng vuông góc','Đường thẳng vuông góc với mặt phẳng','Phép chiếu vuông góc. Góc giữa đường thẳng và mặt phẳng','Hai mặt phẳng vuông góc','Khoảng cách','Thể tích','Biến cố hợp, biến cố giao, biến cố độc lập','Công thức cộng xác suất','Công thức nhân xác suất cho hai biến cố độc lập','Định nghĩa và ý nghĩa của đạo hàm','Các quy tắc tính đạo hàm','Đạo hàm cấp hai','Phép biến hình trong mặt phẳng','Làm quen với một vài khái niệm của lí thuyết đồ thị','Một số yếu tố vẽ kĩ thuật'],
@@ -467,6 +478,9 @@ export default function App() {
   const [session, setSession] = useState<AuthSession | null>(() => getSession());
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [authRole, setAuthRole] = useState<'student' | 'teacher'>('student');
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
   const [examTitle, setExamTitle] = useState('Đề Toán THPT');
   const [duration, setDuration] = useState(45);
   const [classes, setClasses] = useState<ClassRecord[]>([]);
@@ -519,18 +533,57 @@ export default function App() {
     return p;
   }, [englishGrade, englishLevel, englishLesson, englishDang, englishOnlyInteresting, englishSearch]);
 
+  const inTrial = Boolean(profile && new Date(profile.trial_ends_at).getTime() > Date.now());
+  const isAdmin = profile?.role === 'admin';
+  const isTeacher = profile?.role === 'teacher' || isAdmin;
+  const hasFull = Boolean(isAdmin || profile?.full_access || inTrial);
+  const hasEnglish = Boolean(isAdmin || profile?.english_access || profile?.full_access || inTrial);
+  const canTeach = Boolean(isTeacher && hasFull);
+
+  async function loadProfile() {
+    if (!isSupabaseConfigured || !session?.user?.id) { setProfile(null); return; }
+    try {
+      const p = eqParams({ user_id: session.user.id });
+      p.set('select', '*');
+      const rows = await supabaseGet<Profile[]>('profiles', p, true);
+      setProfile(rows[0] ?? null);
+    } catch { setProfile(null); }
+  }
+
+  async function loadProfiles() {
+    if (!isSupabaseConfigured || !isAdmin) return;
+    try {
+      const p = new URLSearchParams({ select: '*', order: 'created_at.asc', limit: '500' });
+      setProfiles(await supabaseGet<Profile[]>('profiles', p, true));
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+  }
+
+  async function updateProfile(userId: string, patch: Partial<Profile>) {
+    try {
+      await supabaseUpdate('profiles', eqParams({ user_id: userId }), patch, true);
+      await loadProfiles();
+      if (userId === session?.user?.id) await loadProfile();
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+  }
+
+  async function requestEnglish() {
+    if (!session?.user?.id) return;
+    await updateProfile(session.user.id, { english_requested: true });
+    setMatrixMsg('Đã gửi yêu cầu cấp quyền Toán tiếng Anh tới quản trị.');
+  }
+
   async function loadEnglish(nextPage = englishPage) {
     if (!isSupabaseConfigured) return;
     setLoading(true); setError('');
     try {
-      const total = await supabaseCount('english_questions', englishParams);
+      const total = await supabaseCount('english_questions', englishParams, true);
       setEnglishTotal(total);
       const p = new URLSearchParams(englishParams);
       p.set('select', '*');
       p.set('order', 'id.asc');
       p.set('limit', String(pageSize));
       p.set('offset', String(nextPage * pageSize));
-      setEnglishQuestions(await supabaseGet<EnglishQuestion[]>('english_questions', p));
+      setEnglishQuestions(await supabaseGet<EnglishQuestion[]>('english_questions', p, true));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally { setLoading(false); }
@@ -543,7 +596,7 @@ export default function App() {
       p.set('select', 'dang_vi');
       p.set('order', 'dang_vi.asc');
       p.set('limit', '5000');
-      const rows = await supabaseGet<{ dang_vi: string }[]>('english_questions', p);
+      const rows = await supabaseGet<{ dang_vi: string }[]>('english_questions', p, true);
       setEnglishDangOptions(Array.from(new Set(rows.map((r) => r.dang_vi))).sort());
     } catch { setEnglishDangOptions([]); }
   }
@@ -551,7 +604,7 @@ export default function App() {
   async function pickRandomEnglishProblem() {
     if (!isSupabaseConfigured) return;
     try {
-      const total = await supabaseCount('english_questions', englishParams);
+      const total = await supabaseCount('english_questions', englishParams, true);
       if (!total) return;
       const offset = Math.floor(Math.random() * total);
       const p = new URLSearchParams(englishParams);
@@ -559,7 +612,7 @@ export default function App() {
       p.set('order', 'id.asc');
       p.set('limit', '1');
       p.set('offset', String(offset));
-      const rows = await supabaseGet<EnglishQuestion[]>('english_questions', p);
+      const rows = await supabaseGet<EnglishQuestion[]>('english_questions', p, true);
       if (rows[0]) { setEnglishQuestions(rows); setEnglishTotal(total); setEnglishPage(0); setEnglishOpenId(rows[0].id); }
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
   }
@@ -571,7 +624,7 @@ export default function App() {
       const [total, theoryTotal, englishTotalCount] = await Promise.all([
         supabaseCount('questions', new URLSearchParams()),
         supabaseCount('theory_notes', new URLSearchParams()),
-        supabaseCount('english_questions', new URLSearchParams()),
+        supabaseCount('english_questions', new URLSearchParams(), Boolean(getSession())).catch(() => 0),
       ]);
       setEnglishTotalAll(englishTotalCount);
       const byGrade: Record<string, number> = {};
@@ -848,14 +901,14 @@ export default function App() {
     try {
       const s = await signIn(email.trim(), password);
       setSession(s);
-      setMatrixMsg('Đã đăng nhập giáo viên.');
+      setMatrixMsg('Đã đăng nhập.');
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setLoading(false); }
   }
 
   async function handleSignUp() {
     setLoading(true); setError('');
     try {
-      const s = await signUp(email.trim(), password);
+      const s = await signUp(email.trim(), password, authRole);
       if (s) { setSession(s); setMatrixMsg('Đã tạo tài khoản và đăng nhập.'); }
       else setMatrixMsg('Đã tạo tài khoản. Nếu Supabase yêu cầu xác nhận email, hãy xác nhận rồi đăng nhập.');
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setLoading(false); }
@@ -1203,9 +1256,11 @@ export default function App() {
   useEffect(() => { void loadOverview(); }, []);
   useEffect(() => { if (tab === 'bank') void loadBank(0); }, [tab]);
   useEffect(() => { if (tab === 'theory') void loadTheory(); }, [tab, theoryGrade]);
-  useEffect(() => { if (tab === 'english') { setEnglishPage(0); void loadEnglish(0); } }, [tab, englishParams]);
+  useEffect(() => { if (tab === 'english' && hasEnglish) { setEnglishPage(0); void loadEnglish(0); } }, [tab, englishParams, hasEnglish]);
   useEffect(() => { if (tab === 'english') void loadEnglishDangs(); }, [tab, englishGrade, englishLesson]);
-  useEffect(() => { if (session) void loadTeacherData(); }, [session]);
+  useEffect(() => { if (session) { void loadProfile(); } else setProfile(null); }, [session]);
+  useEffect(() => { if (session && canTeach) void loadTeacherData(); }, [session, canTeach]);
+  useEffect(() => { if (tab === 'admin' && isAdmin) void loadProfiles(); }, [tab, isAdmin]);
   useEffect(() => { if (tab === 'results' && session) void loadSubmissions(); }, [tab, session]);
   useEffect(() => { if (tab === 'matrix') void loadScopes(); }, [tab, mGrade]);
   useEffect(() => {
@@ -1282,13 +1337,15 @@ export default function App() {
       {loading && <p className="muted no-print">Đang tải…</p>}
       <section className="card no-print">
         {session ? (
-          <div className="filters"><strong>Giáo viên: {session.user?.email ?? 'đã đăng nhập'}</strong><button onClick={() => { signOut(); setSession(null); }}>Đăng xuất</button></div>
+          <div className="filters"><strong>{isAdmin ? 'Quản trị' : profile?.role === 'teacher' ? 'Giáo viên' : 'Học sinh'}: {session.user?.email ?? 'đã đăng nhập'}</strong><span>{isAdmin ? 'Toàn quyền' : profile?.full_access ? 'Đã được cấp full tính năng' : inTrial ? `Dùng thử full tính năng đến ${new Date(profile!.trial_ends_at).toLocaleDateString('vi-VN')}` : 'Tài khoản giới hạn — liên hệ quản trị để cấp quyền'}</span><button onClick={() => { signOut(); setSession(null); setProfile(null); }}>Đăng xuất</button></div>
         ) : (
           <div className="filters">
-            <label>Email giáo viên<input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email" /></label>
+            <label>Email<input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email" /></label>
             <label>Mật khẩu<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="mật khẩu" /></label>
+            <label>Vai trò đăng ký<select value={authRole} onChange={(e) => setAuthRole(e.target.value as 'student' | 'teacher')}><option value="student">Học sinh</option><option value="teacher">Giáo viên</option></select></label>
             <button className="primary" onClick={() => void handleSignIn()}>Đăng nhập</button>
             <button onClick={() => void handleSignUp()}>Tạo tài khoản</button>
+            <span>Tài khoản mới được dùng thử full tính năng 3 ngày.</span>
           </div>
         )}
       </section>
@@ -1339,7 +1396,10 @@ export default function App() {
         </main>
       )}
 
-      {tab === 'english' && (
+      {tab === 'english' && !hasEnglish && (
+        <main><section className="card english-hero"><h2>Toán tiếng Anh THPT</h2><p>{session ? 'Tài khoản của bạn chưa được cấp quyền xem bài tập tiếng Anh. Quản trị cấp quyền thì bạn xem được ngay.' : 'Bạn đăng nhập hoặc tạo tài khoản để dùng thử 3 ngày full tính năng; sau đó quản trị cấp quyền mới xem được bài tập tiếng Anh.'}</p>{session && <button className="primary" onClick={() => void requestEnglish()}>{profile?.english_requested ? 'Đã gửi yêu cầu cấp quyền' : 'Yêu cầu cấp quyền tiếng Anh'}</button>}</section></main>
+      )}
+      {tab === 'english' && hasEnglish && (
         <main>
           <section className="card english-hero">
             <h2>Toán tiếng Anh THPT</h2>
@@ -1482,7 +1542,7 @@ export default function App() {
         <main>
           <section className="card no-print">
             <h2>Lớp và học sinh</h2>
-            {!session && <p className="notice">Đăng nhập giáo viên ở phía trên để tạo lớp, giao bài và xem kết quả.</p>}
+            {!canTeach && <p className="notice">Tính năng này dành cho giáo viên đã được cấp full tính năng (hoặc đang dùng thử 3 ngày).</p>}
             <div className="filters">
               <label>Tên lớp<input value={className} onChange={(e) => setClassName(e.target.value)} placeholder="VD: 12A1" /></label>
               <label>Khối<select value={classGrade} onChange={(e) => setClassGrade(Number(e.target.value))}><option>10</option><option>11</option><option>12</option></select></label>
@@ -1535,7 +1595,7 @@ export default function App() {
       {tab === 'results' && (
         <main className="card no-print">
           <h2>Kết quả và thống kê</h2>
-          {!session && <p className="notice">Đăng nhập giáo viên để xem kết quả.</p>}
+          {!canTeach && <p className="notice">Tính năng này dành cho giáo viên đã được cấp full tính năng (hoặc đang dùng thử 3 ngày).</p>}
           <div className="filters">
             <label>Bài giao<select value={resultAssignmentId} onChange={(e) => setResultAssignmentId(e.target.value)}>{assignments.map((a) => <option key={a.id} value={a.id}>{a.title || `Bài ${a.id}`} — {a.join_code}</option>)}</select></label>
             <button onClick={() => void loadSubmissions()}>Tải kết quả</button>
@@ -1548,8 +1608,16 @@ export default function App() {
 
       {tab === 'admin' && (
         <main className="card no-print">
+          {isAdmin && (
+            <section><h2>Quản trị tài khoản</h2><p>Quản trị nắm mọi quyền: cấp/thu hồi full tính năng, cấp quyền Toán tiếng Anh, đổi vai trò và gia hạn dùng thử.</p>
+            {profiles.map((pr) => (
+              <div className="filters" key={pr.user_id}><strong>{pr.email}</strong><span>{pr.role === 'admin' ? 'Quản trị' : pr.role === 'teacher' ? 'Giáo viên' : 'Học sinh'} · {pr.full_access ? 'Full' : new Date(pr.trial_ends_at).getTime() > Date.now() ? `Dùng thử đến ${new Date(pr.trial_ends_at).toLocaleDateString('vi-VN')}` : 'Giới hạn'} · Tiếng Anh: {pr.english_access || pr.full_access || pr.role === 'admin' ? 'Có' : pr.english_requested ? 'Đang yêu cầu' : 'Chưa'}</span>
+              {pr.role !== 'admin' && <><button onClick={() => void updateProfile(pr.user_id, { full_access: !pr.full_access })}>{pr.full_access ? 'Thu hồi full' : 'Cấp full'}</button><button onClick={() => void updateProfile(pr.user_id, { english_access: !pr.english_access, english_requested: false })}>{pr.english_access ? 'Thu hồi tiếng Anh' : 'Cấp tiếng Anh'}</button><button onClick={() => void updateProfile(pr.user_id, { role: pr.role === 'teacher' ? 'student' : 'teacher' })}>Đổi vai trò</button><button onClick={() => void updateProfile(pr.user_id, { trial_ends_at: new Date(Date.now() + 3 * 86400000).toISOString() })}>Gia hạn 3 ngày</button></>}
+              </div>
+            ))}</section>
+          )}
           <h2>Quản trị câu hỏi</h2>
-          {!session && <p className="notice">Đăng nhập giáo viên để thêm/sửa/xóa câu hỏi.</p>}
+          {!canTeach && <p className="notice">Tính năng này dành cho giáo viên đã được cấp full tính năng (hoặc đang dùng thử 3 ngày).</p>}
           <div className="filters">
             <label>ID câu<input value={adminForm.id} onChange={(e) => setAdminForm({ ...adminForm, id: e.target.value })} placeholder="Để trống để thêm mới" /></label>
             <button onClick={() => void loadAdminQuestion()}>Tải câu</button>

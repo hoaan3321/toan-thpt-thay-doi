@@ -101,13 +101,13 @@ export async function supabaseGet<T>(path: string, params: URLSearchParams, useA
   return (await res.json()) as T;
 }
 
-export async function supabaseCount(path: string, params: URLSearchParams): Promise<number> {
+export async function supabaseCount(path: string, params: URLSearchParams, useAuth = false): Promise<number> {
   if (!isSupabaseConfigured) throw new Error('Chưa cấu hình Supabase');
   const p = new URLSearchParams(params);
   p.set('select', 'id');
-  const res = await fetch(`${url}/rest/v1/${path}?${p.toString()}`, {
-    headers: headers({ Prefer: 'count=exact', Range: '0-0' }),
-  });
+  const res = await authedFetch(`${url}/rest/v1/${path}?${p.toString()}`, {
+    headers: headers({ Prefer: 'count=exact', Range: '0-0' }, useAuth),
+  }, useAuth);
   if (!res.ok) throw new Error(await parseError(res));
   const range = res.headers.get('content-range') ?? '';
   const total = Number(range.split('/')[1]);
@@ -158,12 +158,12 @@ export async function signIn(email: string, password: string): Promise<AuthSessi
   return session;
 }
 
-export async function signUp(email: string, password: string): Promise<AuthSession | null> {
+export async function signUp(email: string, password: string, role: 'student' | 'teacher' = 'student'): Promise<AuthSession | null> {
   if (!isSupabaseConfigured) throw new Error('Chưa cấu hình Supabase');
   const res = await fetch(`${url}/auth/v1/signup`, {
     method: 'POST',
     headers: { apikey: anonKey ?? '', 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, data: { role } }),
   });
   if (!res.ok) throw new Error(await parseError(res));
   const data = (await res.json()) as AuthSession;
