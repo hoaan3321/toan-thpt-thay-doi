@@ -41,7 +41,7 @@ interface Profile {
   created_at: string;
 }
 
-interface EnglishVocabulary { id: string; grade: number; lesson: string; lesson_vi: string; term: string; meaning: string; freq: number; }
+interface EnglishVocabulary { id: string; grade: number; lesson: string; lesson_vi: string; term: string; meaning: string; freq: number; ipa?: string; }
 
 const ENGLISH_LESSONS: Record<number, string[]> = {
   10: ['Mệnh đề','Tập hợp','Các phép toán trên tập hợp','Bất phương trình bậc nhất hai ẩn','Hệ bất phương trình bậc nhất hai ẩn','Giá trị lượng giác của một góc từ 0° đến 180°','Hệ thức lượng trong tam giác','Các khái niệm mở đầu','Tổng và hiệu của hai vectơ','Tích của một vectơ với một số','Vectơ trong mặt phẳng tọa độ','Tích vô hướng của hai vectơ','Số gần đúng và sai số','Các số đặc trưng đo xu thế trung tâm','Các số đặc trưng đo độ phân tán','Hàm số','Hàm số bậc hai','Dấu của tam thức bậc hai','Phương trình quy về phương trình bậc hai','Phương trình đường thẳng','Vị trí tương đối giữa hai đường thẳng. Góc và khoảng cách','Đường tròn trong mặt phẳng tọa độ','Ba đường conic','Quy tắc đếm','Hoán vị, chỉnh hợp và tổ hợp','Nhị thức Newton','Biến cố và định nghĩa cổ điển của xác suất','Thực hành tính xác suất theo định nghĩa cổ điển','Hệ phương trình bậc nhất ba ẩn','Phương pháp quy nạp toán học. Nhị thức Newton','Ba đường conic và ứng dụng'],
@@ -589,6 +589,14 @@ export default function App() {
       p.set('select', '*'); p.set('order', 'freq.desc,term.asc'); p.set('limit', String(pageSize)); p.set('offset', String(nextPage * pageSize));
       setVocabRows(await supabaseGet<EnglishVocabulary[]>('english_vocabulary', p, true));
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setLoading(false); }
+  }
+
+  function speakTerm(term: string, rate = 0.9) {
+    try {
+      const u = new SpeechSynthesisUtterance(term);
+      u.lang = 'en-US'; u.rate = rate;
+      window.speechSynthesis.cancel(); window.speechSynthesis.speak(u);
+    } catch { /* trình duyệt không hỗ trợ phát âm */ }
   }
 
   function toggleMastered(id: string) {
@@ -1447,7 +1455,7 @@ export default function App() {
             {vocabRows.map((v) => (
               <article className="card english-card" key={v.id}>
                 <p className="meta">Grade {v.grade} · Bài: {v.lesson_vi} ({v.lesson}) · Gặp trong {v.freq} câu</p>
-                <h2>{v.term}</h2><p><strong>Nghĩa:</strong> {v.meaning}</p>
+                <h2>{v.term} {v.ipa && <span className="muted">{v.ipa}</span>}</h2><p><strong>Nghĩa:</strong> {v.meaning}</p><div className="filters"><button onClick={() => speakTerm(v.term)}>🔊 Nghe</button><button onClick={() => speakTerm(v.term, 0.6)}>Nghe chậm</button></div>
                 <label className="check"><input type="checkbox" checked={mastered.has(v.id)} onChange={() => toggleMastered(v.id)} /> Đã nắm từ này</label>
               </article>
             ))}
