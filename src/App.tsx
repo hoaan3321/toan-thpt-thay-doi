@@ -882,7 +882,7 @@ export default function App() {
     return qs.reduce((s, q) => s + Number(q.points || 0), 0);
   }
 
-  function exportDocx() {
+  function exportDocx(kind: 'de' | 'dapan' = 'de') {
     const enc = new TextEncoder();
     const run = (text: string, bold = false, size = 24) => `<w:r><w:rPr>${bold ? '<w:b/>' : ''}<w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"/><w:sz w:val="${size}"/></w:rPr><w:t xml:space="preserve">${xmlEscape(text)}</w:t></w:r>`;
     const richRuns = (text: string, bold = false, size = 24): string => {
@@ -899,7 +899,7 @@ export default function App() {
     const body: string[] = [];
     generated.forEach((code, ci) => {
       if (ci > 0) body.push('<w:p><w:r><w:br w:type="page"/></w:r></w:p>');
-      body.push(para(`ĐỀ TOÁN LỚP ${mGrade} — MÃ ĐỀ ${String(code.code).padStart(2, '0')}`, { bold: true, size: 28, align: 'center', after: 40 }));
+      body.push(para(`${kind === 'dapan' ? 'ĐÁP ÁN ĐỀ' : 'ĐỀ'} TOÁN LỚP ${mGrade} — MÃ ĐỀ ${String(code.code).padStart(2, '0')}`, { bold: true, size: 28, align: 'center', after: 40 }));
       body.push(para(`Thời gian: ${duration} phút · Tổng điểm: ${fmtPoints(code.rawPoints)} điểm`, { align: 'center', after: 120 }));
       for (const qt of QTYPES) {
         const qs = code.questions.filter((q) => q.qtype === qt);
@@ -908,7 +908,7 @@ export default function App() {
         qs.forEach((q, i) => {
           body.push(para(`Câu ${i + 1}. ${q.content}`, { after: 40, rich: true }));
           (q.options ?? []).forEach((op, oi) => body.push(para(`${'ABCD'[oi] ?? oi + 1}. ${op}`, { indent: 360, after: 20, rich: true })));
-          if (showAnswers) {
+          if (kind === 'dapan') {
             body.push(para(`Đáp án: ${q.correct}`, { bold: true, indent: 360, after: 20, rich: true }));
             if (q.explanation) body.push(para(q.explanation, { indent: 360, after: 80, rich: true }));
           }
@@ -920,7 +920,7 @@ export default function App() {
     const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>`;
     const rels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`;
     const docRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`;
-    downloadBlob('de-toan.docx', zipStore([
+    downloadBlob(kind === 'dapan' ? 'dap-an.docx' : 'de-toan.docx', zipStore([
       { name: '[Content_Types].xml', data: enc.encode(contentTypes) },
       { name: '_rels/.rels', data: enc.encode(rels) },
       { name: 'word/document.xml', data: enc.encode(documentXml) },
@@ -929,7 +929,7 @@ export default function App() {
     ]));
   }
 
-  function exportLatex() {
+  function exportLatex(kind: 'de' | 'dapan' = 'de') {
     const lines: string[] = [
       '% Biên dịch bằng XeLaTeX hoặc LuaLaTeX',
       '\\documentclass[12pt,a4paper]{article}',
@@ -944,7 +944,7 @@ export default function App() {
     ];
     generated.forEach((code, ci) => {
       if (ci > 0) lines.push('\\newpage');
-      lines.push(`\\begin{center}\\textbf{\\large ĐỀ TOÁN LỚP ${mGrade} --- MÃ ĐỀ ${String(code.code).padStart(2, '0')}}\\\\[2pt] Thời gian: ${duration} phút \\quad Tổng điểm: ${fmtPoints(code.rawPoints)} điểm\\end{center}`);
+      lines.push(`\\begin{center}\\textbf{\\large ${kind === 'dapan' ? 'ĐÁP ÁN ĐỀ' : 'ĐỀ'} TOÁN LỚP ${mGrade} --- MÃ ĐỀ ${String(code.code).padStart(2, '0')}}\\\\[2pt] Thời gian: ${duration} phút \\quad Tổng điểm: ${fmtPoints(code.rawPoints)} điểm\\end{center}`);
       for (const qt of QTYPES) {
         const qs = code.questions.filter((q) => q.qtype === qt);
         if (!qs.length) continue;
@@ -956,7 +956,7 @@ export default function App() {
             q.options.forEach((op) => lines.push(`\\item ${op}`));
             lines.push('\\end{enumerate}');
           }
-          if (showAnswers) {
+          if (kind === 'dapan') {
             lines.push(`\\textbf{Đáp án:} ${q.correct}`);
             if (q.explanation) lines.push(q.explanation);
           }
@@ -964,10 +964,11 @@ export default function App() {
       }
     });
     lines.push('\\end{document}');
-    downloadText('de-toan.tex', lines.join('\n'), 'text/x-tex;charset=utf-8');
+    downloadText(kind === 'dapan' ? 'dap-an.tex' : 'de-toan.tex', lines.join('\n'), 'text/x-tex;charset=utf-8');
   }
 
-  function exportPdf() {
+  function exportPdf(kind: 'de' | 'dapan' = 'de') {
+    setShowAnswers(kind === 'dapan');
     setTab('print');
     window.setTimeout(() => window.print(), 350);
   }
@@ -1174,9 +1175,12 @@ export default function App() {
             <label>Thời gian (phút)<input type="number" min={1} value={duration} onChange={(e) => setDuration(Math.max(1, Number(e.target.value)))} /></label>
             <label>Lớp giao bài<select value={selectedClassId} onChange={(e) => setSelectedClassId(e.target.value)}><option value="">Không gắn lớp</option>{classes.map((c) => <option key={c.id} value={c.id}>{c.name} — lớp {c.grade}</option>)}</select></label>
             <button onClick={() => void saveGeneratedAsAssignment()}>Lưu đề & giao bài</button>
-            <button onClick={exportDocx} disabled={!generated.length}>Xuất DOCX</button>
-            <button onClick={exportPdf} disabled={!generated.length}>Xuất PDF</button>
-            <button onClick={exportLatex} disabled={!generated.length}>Xuất LaTeX</button>
+            <button onClick={() => exportDocx('de')} disabled={!generated.length}>Xuất đề DOCX</button>
+            <button onClick={() => exportDocx('dapan')} disabled={!generated.length}>Xuất đáp án DOCX</button>
+            <button onClick={() => exportPdf('de')} disabled={!generated.length}>Xuất đề PDF</button>
+            <button onClick={() => exportPdf('dapan')} disabled={!generated.length}>Xuất đáp án PDF</button>
+            <button onClick={() => exportLatex('de')} disabled={!generated.length}>Xuất đề LaTeX</button>
+            <button onClick={() => exportLatex('dapan')} disabled={!generated.length}>Xuất đáp án LaTeX</button>
           </div>
           {matrixMsg && <p className="notice">{matrixMsg}</p>}
         </main>
@@ -1185,9 +1189,12 @@ export default function App() {
       {tab === 'print' && (
         <main>
           <div className="no-print filters">
-            <button className="primary" onClick={() => window.print()}>In đề / Xuất PDF</button>
-            <button onClick={exportDocx} disabled={!generated.length}>Xuất DOCX</button>
-            <button onClick={exportLatex} disabled={!generated.length}>Xuất LaTeX</button>
+            <button className="primary" onClick={() => exportPdf('de')}>In đề / Xuất PDF</button>
+            <button onClick={() => exportPdf('dapan')}>In đáp án / Xuất PDF</button>
+            <button onClick={() => exportDocx('de')} disabled={!generated.length}>Xuất đề DOCX</button>
+            <button onClick={() => exportDocx('dapan')} disabled={!generated.length}>Xuất đáp án DOCX</button>
+            <button onClick={() => exportLatex('de')} disabled={!generated.length}>Xuất đề LaTeX</button>
+            <button onClick={() => exportLatex('dapan')} disabled={!generated.length}>Xuất đáp án LaTeX</button>
             <label className="check"><input type="checkbox" checked={showAnswers} onChange={(e) => setShowAnswers(e.target.checked)} /> In kèm đáp án/lời giải</label>
           </div>
           {generated.length === 0 && <p className="muted">Chưa có mã đề. Hãy vào mục Tạo đề để sinh mã.</p>}
