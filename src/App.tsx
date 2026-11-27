@@ -930,7 +930,7 @@ export default function App() {
           else docxOpts.forEach((op) => body.push(para(op, { indent: 360, after: 20, rich: true })));
           if (kind === 'dapan') {
             body.push(para(`Đáp án: ${q.correct}`, { bold: true, indent: 360, after: 20, rich: true }));
-            if (q.explanation) body.push(para(q.explanation, { indent: 360, after: 80, rich: true }));
+            if (q.explanation) body.push(para(`Lời giải: ${q.explanation}`, { indent: 360, after: 80, rich: true }));
           }
         });
       }
@@ -980,7 +980,7 @@ export default function App() {
           }
           if (kind === 'dapan') {
             lines.push(`\\textbf{Đáp án:} ${q.correct}`);
-            if (q.explanation) lines.push(q.explanation);
+            if (q.explanation) lines.push(`\\textbf{Lời giải:} ${q.explanation}`);
           }
         });
       }
@@ -1234,7 +1234,7 @@ export default function App() {
                       <article className="question" key={q.id}>
                         <p><strong>Câu {i + 1}.</strong> <MathText text={stripSourcePrefix(q.content)} /></p>
                         {q.options?.length > 0 && <div className={`options-grid cols-${optionLayout(q.options)}`}>{q.options.map((op, oi) => <span key={oi}><strong>{'ABCD'[oi] ?? oi + 1}.</strong> <MathText text={stripOptionPrefix(op)} /></span>)}</div>}
-                        {showAnswers && <div className="answer"><p><strong>Đáp án:</strong> <MathText text={q.correct} /></p><MathText text={q.explanation} /></div>}
+                        {showAnswers && <div className="answer"><p><strong>Đáp án:</strong> <MathText text={q.correct} /></p>{q.explanation && <p><strong>Lời giải:</strong> <MathText text={q.explanation} /></p>}</div>}
                       </article>
                     ))}
                   </div>
