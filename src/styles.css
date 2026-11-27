@@ -60,3 +60,38 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .ai-messages{padding:12px;overflow:auto;display:flex;flex-direction:column;gap:8px;background:#f8fafc}.ai-msg{padding:9px 11px;border-radius:14px;max-width:88%;white-space:pre-wrap;line-height:1.45}.ai-msg.user{align-self:flex-end;background:#2563eb;color:#fff}.ai-msg.assistant{align-self:flex-start;background:#fff;border:1px solid #e2e8f0}
 .ai-input{display:flex;gap:8px;padding:10px;border-top:1px solid #e2e8f0;background:#fff}.ai-input textarea{flex:1;resize:none;border:1px solid #cbd5e1;border-radius:12px;padding:9px}
 .install-btn{margin-top:8px;background:#2563eb;color:#fff;border:0;border-radius:999px;padding:8px 14px;font-weight:700;cursor:pointer}
+
+/* Giao diện mới 2026-11-27 */
+body { background: linear-gradient(180deg, #eaf2ff 0%, #f6f8fc 260px, #f6f8fc 100%); min-height: 100vh; }
+.app { padding: 18px 16px 90px; }
+.topbar { display: block; background: linear-gradient(135deg, #1e40af 0%, #2563eb 55%, #0ea5e9 100%); color: #fff; border-radius: 24px; padding: 20px; box-shadow: 0 18px 40px rgba(37,99,235,.28); margin-bottom: 16px; }
+.topbar h1 { color: #fff; font-size: 30px; letter-spacing: -.02em; }
+.topbar p { color: #dbeafe; }
+.app-clock { display: inline-block; margin-top: 10px !important; background: rgba(255,255,255,.16); color: #fff !important; border: 1px solid rgba(255,255,255,.28); border-radius: 999px; padding: 6px 12px; font-size: 14px; }
+.install-btn { display: block; margin-top: 12px; background: #fff; color: #1d4ed8; box-shadow: 0 8px 20px rgba(15,23,42,.18); }
+.topbar nav { margin-top: 16px; gap: 8px; }
+.topbar nav button { background: rgba(255,255,255,.14); color: #fff; border-color: rgba(255,255,255,.25); border-radius: 999px; font-weight: 600; }
+.topbar nav button.active { background: #fff; color: #1d4ed8; border-color: #fff; }
+.card, .exam { border-radius: 20px; border-color: #e5edf9; box-shadow: 0 12px 30px rgba(15,23,42,.07); }
+.card h2, .card h3 { margin-top: 0; }
+.big { color: #1d4ed8; font-size: 44px; }
+button { border-radius: 12px; }
+button.primary, button.active { background: #2563eb; border-color: #2563eb; }
+.filters input, .filters select, .field input, textarea { border-radius: 12px; }
+@media (max-width: 720px) {
+  .app { padding: 12px 12px 90px; }
+  .topbar { padding: 16px; border-radius: 20px; }
+  .topbar h1 { font-size: 25px; }
+  .topbar nav { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 7px; }
+  .topbar nav button { padding: 9px 4px; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .grid { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
+  .card, .exam { padding: 14px; border-radius: 16px; }
+  .big { font-size: 32px; }
+  .filters { gap: 8px; }
+  .filters label { flex: 1 1 150px; }
+  .filters input, .filters select { min-width: 0; width: 100%; }
+}
+@media (max-width: 420px) {
+  .app-clock { font-size: 13px; }
+  .grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+}
