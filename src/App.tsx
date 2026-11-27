@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import MathText from './MathText';
-import { eqParams, getSession, ilike, isSupabaseConfigured, signIn, signOut, signUp, supabaseCount, supabaseDelete, supabaseGet, supabaseInsert, supabaseUpdate, type AuthSession } from './supabase';
+import { eqParams, getSession, ilike, isSupabaseConfigured, signIn, signOut, signUp, recoverPassword, resendConfirmation, updatePassword, supabaseCount, supabaseDelete, supabaseGet, supabaseInsert, supabaseUpdate, type AuthSession } from './supabase';
 import { LEVELS, QTYPES, QTYPE_LABEL, type Assignment, type ClassRecord, type ExamRecord, type Level, type QType, type Question, type StudentRecord, type Submission, type TheoryNote } from './types';
 
 type Tab = 'overview' | 'bank' | 'theory' | 'english' | 'matrix' | 'print' | 'assign' | 'take' | 'results' | 'admin' | 'users';
@@ -486,6 +486,8 @@ export default function App() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [authRole, setAuthRole] = useState<'student' | 'teacher'>('student');
+  const [showPassword, setShowPassword] = useState(false);
+  const [recoveryToken, setRecoveryToken] = useState('');
   const [profile, setProfile] = useState<Profile | null>(null);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [userSearch, setUserSearch] = useState('');
@@ -939,6 +941,21 @@ export default function App() {
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setLoading(false); }
   }
 
+  async function handleRecover() {
+    if (!email.trim()) { setError('Nhập email rồi bấm Quên mật khẩu nhé.'); return; }
+    try { await recoverPassword(email.trim()); setMatrixMsg('Đã gửi email đặt lại mật khẩu. Kiểm tra hộp thư nhé.'); } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+  }
+
+  async function handleResend() {
+    if (!email.trim()) { setError('Nhập email rồi bấm Gửi lại email xác nhận nhé.'); return; }
+    try { await resendConfirmation(email.trim()); setMatrixMsg('Đã gửi lại email xác nhận tài khoản.'); } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+  }
+
+  async function handleNewPassword() {
+    if (!recoveryToken || password.length < 6) { setError('Mật khẩu mới cần ít nhất 6 ký tự.'); return; }
+    try { await updatePassword(recoveryToken, password); setRecoveryToken(''); window.history.replaceState(null, '', window.location.pathname); setMatrixMsg('Đã đổi mật khẩu. Đăng nhập bằng mật khẩu mới nhé.'); } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+  }
+
   async function handleSignUp() {
     setLoading(true); setError('');
     try {
@@ -1293,6 +1310,7 @@ export default function App() {
   useEffect(() => { if (tab === 'english' && hasEnglish && englishMode === 'problems') { setEnglishPage(0); void loadEnglish(0); } }, [tab, englishParams, hasEnglish, englishMode]);
   useEffect(() => { if (tab === 'english' && hasEnglish && englishMode === 'vocab') { setVocabPage(0); void loadVocab(0); } }, [tab, hasEnglish, englishMode, englishGrade, englishLesson, englishSearch]);
   useEffect(() => { if (tab === 'english') void loadEnglishDangs(); }, [tab, englishGrade, englishLesson]);
+  useEffect(() => { const h = new URLSearchParams(window.location.hash.replace(/^#/, '')); if (h.get('type') === 'recovery' && h.get('access_token')) { setRecoveryToken(h.get('access_token') ?? ''); setMatrixMsg('Nhập mật khẩu mới rồi bấm Đặt mật khẩu mới nhé.'); } }, []);
   useEffect(() => { if (session) { void loadProfile(); } else setProfile(null); }, [session]);
   useEffect(() => { if (session && canTeach) void loadTeacherData(); }, [session, canTeach]);
   useEffect(() => { if ((tab === 'admin' || tab === 'users') && isAdmin) void loadProfiles(); }, [tab, isAdmin]);
@@ -1392,11 +1410,11 @@ export default function App() {
         ) : (
           <div className="filters">
             <label>Email<input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email" /></label>
-            <label>Mật khẩu<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="mật khẩu" /></label>
+            <label>Mật khẩu<input type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="mật khẩu" /></label><button onClick={() => setShowPassword(!showPassword)}>{showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}</button>
             <label>Vai trò đăng ký<select value={authRole} onChange={(e) => setAuthRole(e.target.value as 'student' | 'teacher')}><option value="student">Học sinh</option><option value="teacher">Giáo viên</option></select></label>
             <button className="primary" onClick={() => void handleSignIn()}>Đăng nhập</button>
-            <button onClick={() => void handleSignUp()}>Tạo tài khoản</button>
-            <span>Tài khoản mới được dùng thử full tính năng 3 ngày.</span>
+            <button onClick={() => void handleSignUp()}>Đăng ký</button><button onClick={() => void handleRecover()}>Quên mật khẩu</button><button onClick={() => void handleResend()}>Gửi lại email xác nhận</button>{recoveryToken && <button className="primary" onClick={() => void handleNewPassword()}>Đặt mật khẩu mới</button>}
+            <span>Tài khoản mới được dùng thử full tính năng 3 ngày. Mật khẩu được mã hóa một chiều, app không lưu mật khẩu gốc.</span>
           </div>
         )}
       </section>

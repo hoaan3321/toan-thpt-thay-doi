@@ -163,7 +163,7 @@ export async function signUp(email: string, password: string, role: 'student' | 
   const res = await fetch(`${url}/auth/v1/signup`, {
     method: 'POST',
     headers: { apikey: anonKey ?? '', 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password, data: { role } }),
+    body: JSON.stringify({ email, password, data: { role }, options: { email_redirect_to: window.location.origin } }),
   });
   if (!res.ok) throw new Error(await parseError(res));
   const data = (await res.json()) as AuthSession;
@@ -188,4 +188,25 @@ export function eqParams(values: Record<string, string | number | undefined>): U
 
 export function ilike(value: string): string {
   return `ilike.*${value.replace(/[%*,()]/g, ' ')}*`;
+}
+
+export async function recoverPassword(email: string): Promise<void> {
+  const res = await fetch(`${url}/auth/v1/recover?redirect_to=${encodeURIComponent(window.location.origin)}`, {
+    method: 'POST', headers: headers({ 'Content-Type': 'application/json' }, false), body: JSON.stringify({ email }),
+  });
+  if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.msg || d.message || `Supabase ${res.status}`); }
+}
+
+export async function resendConfirmation(email: string): Promise<void> {
+  const res = await fetch(`${url}/auth/v1/resend`, {
+    method: 'POST', headers: headers({ 'Content-Type': 'application/json' }, false), body: JSON.stringify({ type: 'signup', email, options: { email_redirect_to: window.location.origin } }),
+  });
+  if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.msg || d.message || `Supabase ${res.status}`); }
+}
+
+export async function updatePassword(accessToken: string, password: string): Promise<void> {
+  const res = await fetch(`${url}/auth/v1/user`, {
+    method: 'PUT', headers: { apikey: anonKey ?? '', Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ password }),
+  });
+  if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.msg || d.message || `Supabase ${res.status}`); }
 }
