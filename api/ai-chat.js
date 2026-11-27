@@ -25,13 +25,15 @@ function systemPrompt(context) {
   return `Bạn là trợ lý AI của app Toán THPT Thầy Đôi. Trả lời bằng tiếng Việt, ngắn gọn, rõ ràng, đúng toán THPT Việt Nam. Khi có công thức, dùng LaTeX trong $...$ hoặc $$...$$. Nếu người dùng hỏi về câu hỏi/đề đang xem, hãy dựa vào ngữ cảnh sau nếu có:\n${ctx}`;
 }
 
-async function callOpenAICompatible({ url, key, model, messages, context }) {
+async function callOpenAICompatible({ url, key, model, messages, context, image }) {
   const res = await fetch(url, { signal: AbortSignal.timeout(15000),
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
     body: JSON.stringify({
       model,
-      messages: [{ role: 'system', content: systemPrompt(context) }, ...messages],
+      messages: [{ role: 'system', content: systemPrompt(context) }, ...messages.map((m, i) => (image && i === messages.length - 1 && m.role === 'user'
+        ? { role: 'user', content: [{ type: 'text', text: m.content }, { type: 'image_url', image_url: { url: `data:${image.mimeType};base64,${image.data}` } }] }
+        : m))],
       temperature: 0.3,
       max_tokens: 900,
     }),
@@ -41,8 +43,9 @@ async function callOpenAICompatible({ url, key, model, messages, context }) {
   return data?.choices?.[0]?.message?.content || '';
 }
 
-async function callGemini({ key, model, messages, context }) {
+async function callGemini({ key, model, messages, context, image }) {
   const contents = messages.map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }));
+  if (image && contents.length) contents[contents.length - 1].parts.push({ inlineData: { mimeType: image.mimeType, data: image.data } });
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, { signal: AbortSignal.timeout(15000),
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
@@ -88,30 +91,35 @@ export default async function handler(req, res) {
     return;
   }
   const context = body.context || '';
+  let image = null;
+  if (body.image && typeof body.image.data === 'string' && body.image.data.length <= 6000000) {
+    image = { mimeType: String(body.image.mimeType || 'image/jpeg').slice(0, 50), data: body.image.data };
+  }
   const errors = [];
-  for (const p of list) {
+  const ordered = image ? [...list].sort((a, b) => (a === 'gemini' ? -1 : b === 'gemini' ? 1 : 0)) : list;
+  for (const p of ordered) {
     try {
       let text = '';
       if (p === 'groq') {
         const groqModels = [...new Set([process.env.GROQ_MODEL, 'llama-3.3-70b-versatile', 'llama-3.1-8b-instant'].filter(Boolean))];
         const groqErrors = [];
         for (const gm of groqModels) {
-          try { text = await callOpenAICompatible({ url: 'https://api.groq.com/openai/v1/chat/completions', key: process.env.GROQ_API_KEY, model: gm, messages, context }); if (text.trim()) break; }
+          try { text = await callOpenAICompatible({ url: 'https://api.groq.com/openai/v1/chat/completions', key: process.env.GROQ_API_KEY, model: gm, messages, context, image }); if (text.trim()) break; }
           catch (e) { groqErrors.push(`${gm}: ${e instanceof Error ? e.message : String(e)}`); }
         }
         if (!text.trim() && groqErrors.length) throw new Error(groqErrors.join('; '));
       } else if (p === 'cerebras') {
-        text = await callOpenAICompatible({ url: 'https://api.cerebras.ai/v1/chat/completions', key: process.env.CEREBRAS_API_KEY, model: process.env.CEREBRAS_MODEL || 'gpt-oss-120b', messages, context });
+        text = await callOpenAICompatible({ url: 'https://api.cerebras.ai/v1/chat/completions', key: process.env.CEREBRAS_API_KEY, model: process.env.CEREBRAS_MODEL || 'gpt-oss-120b', messages, context, image });
       } else if (p === 'sambanova') {
-        text = await callOpenAICompatible({ url: 'https://api.sambanova.ai/v1/chat/completions', key: process.env.SAMBANOVA_API_KEY, model: process.env.SAMBANOVA_MODEL || 'gemma-4-31B-it', messages, context });
+        text = await callOpenAICompatible({ url: 'https://api.sambanova.ai/v1/chat/completions', key: process.env.SAMBANOVA_API_KEY, model: process.env.SAMBANOVA_MODEL || 'gemma-4-31B-it', messages, context, image });
       } else if (p === 'cloudflare') {
-        text = await callOpenAICompatible({ url: `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/ai/v1/chat/completions`, key: process.env.CLOUDFLARE_API_TOKEN, model: process.env.CLOUDFLARE_MODEL || '@cf/google/gemma-4-26b-a4b-it', messages, context });
+        text = await callOpenAICompatible({ url: `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/ai/v1/chat/completions`, key: process.env.CLOUDFLARE_API_TOKEN, model: process.env.CLOUDFLARE_MODEL || '@cf/google/gemma-4-26b-a4b-it', messages, context, image });
       } else if (p === 'gemini') {
         const models = [...new Set([process.env.GEMINI_MODEL, 'gemini-flash-lite-latest', 'gemini-3.5-flash-lite', 'gemini-3.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-3.8-flash'].filter(Boolean))];
         const modelErrors = [];
         for (const model of models) {
           try {
-            text = await callGemini({ key: process.env.GEMINI_API_KEY, model, messages, context });
+            text = await callGemini({ key: process.env.GEMINI_API_KEY, model, messages, context, image });
             if (text.trim()) break;
           } catch (e) { modelErrors.push(`${model}: ${e instanceof Error ? e.message : String(e)}`); }
         }
@@ -123,6 +131,7 @@ export default async function handler(req, res) {
           model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
           messages,
           context,
+          image,
         });
       } else if (p === 'openrouter') {
         text = await callOpenAICompatible({
@@ -131,6 +140,7 @@ export default async function handler(req, res) {
           model: process.env.OPENROUTER_MODEL || 'openrouter/free',
           messages,
           context,
+          image,
         });
       }
       if (text.trim()) {

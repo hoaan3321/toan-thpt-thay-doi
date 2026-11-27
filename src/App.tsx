@@ -515,7 +515,8 @@ export default function App() {
   const [aiInput, setAiInput] = useState('');
   const [aiBusy, setAiBusy] = useState(false);
   const [aiStatus, setAiStatus] = useState('Đang kiểm tra AI…');
-  const [aiMessages, setAiMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([{ role: 'assistant', content: 'Thầy hỏi em về bài toán, cách tạo đề hoặc câu đang xem nhé.' }]);
+  const [aiMessages, setAiMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([{ role: 'assistant', content: 'Thầy hỏi em về bài toán, cách tạo đề hoặc gửi ảnh bài tập để em giải nhé.' }]);
+  const [aiImage, setAiImage] = useState<{ mimeType: string; data: string; preview: string } | null>(null);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [showInstallHelp, setShowInstallHelp] = useState(false);
 
@@ -1321,15 +1322,31 @@ export default function App() {
     return parts.join('\n');
   }
 
+  function pickAiImage(file: File) {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, 1024 / Math.max(img.width, img.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale); canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d')?.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const url = canvas.toDataURL('image/jpeg', 0.85);
+      setAiImage({ mimeType: 'image/jpeg', data: url.split(',')[1] ?? '', preview: url });
+      URL.revokeObjectURL(img.src);
+    };
+    img.src = URL.createObjectURL(file);
+  }
+
   async function sendAi() {
-    const text = aiInput.trim();
+    const text = aiInput.trim() || (aiImage ? 'Giải bài tập trong ảnh này giúp em, trình bày lời giải rõ ràng.' : '');
     if (!text || aiBusy) return;
-    const next = [...aiMessages, { role: 'user' as const, content: text }];
+    const next = [...aiMessages, { role: 'user' as const, content: aiImage ? `${text} (kèm ảnh bài tập)` : text }];
+    const image = aiImage ? { mimeType: aiImage.mimeType, data: aiImage.data } : undefined;
     setAiMessages(next);
     setAiInput('');
+    setAiImage(null);
     setAiBusy(true);
     try {
-      const res = await fetch('/api/ai-chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages: next, context: aiContext() }) });
+      const res = await fetch('/api/ai-chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages: next, context: aiContext(), image }) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `AI HTTP ${res.status}`);
       setAiMessages([...next, { role: 'assistant', content: data.text || 'AI chưa trả lời được.' }]);
@@ -1686,7 +1703,7 @@ export default function App() {
         <section className="ai-panel no-print">
           <div className="ai-head"><strong>Chat AI Toán</strong><span>{aiStatus}</span><button onClick={() => setAiOpen(false)}>×</button></div>
           <div className="ai-messages">{aiMessages.map((m, i) => <div key={i} className={`ai-msg ${m.role}`}><MathText text={m.content} /></div>)}{aiBusy && <div className="ai-msg assistant">AI đang trả lời…</div>}</div>
-          <div className="ai-input"><textarea rows={2} value={aiInput} onChange={(e) => setAiInput(e.target.value)} placeholder="Hỏi AI về bài toán, đề thi, cách giải…" onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void sendAi(); } }} /><button className="primary" onClick={() => void sendAi()} disabled={aiBusy}>Gửi</button></div>
+          {aiImage && <div className="ai-preview"><img src={aiImage.preview} alt="Ảnh bài tập" style={{ maxWidth: 120, borderRadius: 8 }} /><button onClick={() => setAiImage(null)}>Bỏ ảnh</button></div>}<div className="ai-input"><label className="ai-attach">📷 Ảnh<input type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) pickAiImage(f); e.target.value = ''; }} /></label><textarea rows={2} value={aiInput} onChange={(e) => setAiInput(e.target.value)} placeholder="Hỏi AI về bài toán, đề thi, cách giải…" onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void sendAi(); } }} /><button className="primary" onClick={() => void sendAi()} disabled={aiBusy}>Gửi</button></div>
         </section>
       )}
     </div>
