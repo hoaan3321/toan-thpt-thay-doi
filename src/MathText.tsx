@@ -11,7 +11,8 @@ function escapeHtml(s: string): string {
 
 function renderMath(tex: string, displayMode: boolean): string {
   try {
-    return katex.renderToString(tex, { displayMode, throwOnError: false, strict: 'ignore' });
+    const clean = tex.replace(/\\hfill/g, '\\quad').replace(/\\displaystyle/g, '');
+    return katex.renderToString(clean, { displayMode, throwOnError: false, strict: 'ignore' });
   } catch {
     return escapeHtml(tex);
   }

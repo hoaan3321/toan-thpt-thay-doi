@@ -20,9 +20,17 @@ function cleanMessages(messages) {
   })).filter((m) => m.content.trim());
 }
 
+function cleanAiText(t) {
+  return String(t || '')
+    .replace(/\\hfill/g, '\\quad')
+    .replace(/\\\[/g, '$$').replace(/\\\]/g, '$$')
+    .replace(/\\\(/g, '$').replace(/\\\)/g, '$')
+    .replace(/\$\s*\n\s*/g, '$').replace(/\s*\n\s*\$/g, '$');
+}
+
 function systemPrompt(context) {
   const ctx = String(context || '').slice(0, 6000);
-  return `Bạn là trợ lý AI của app Toán THPT Thầy Đôi. Trả lời bằng tiếng Việt. Lời giải phải ngắn gọn, súc tích nhưng đầy đủ các bước chính, không lan man, không lặp ý; trình bày theo bước ngắn và kết luận đáp số rõ ràng. Khi có công thức, dùng LaTeX trong $...$ hoặc $$...$$. Nếu người dùng hỏi về câu hỏi/đề đang xem, hãy dựa vào ngữ cảnh sau nếu có:\n${ctx}`;
+  return `Bạn là trợ lý AI của app Toán THPT Thầy Đôi. Trả lời bằng tiếng Việt. Lời giải phải ngắn gọn, súc tích nhưng đầy đủ các bước chính, không lan man, không lặp ý; trình bày theo bước ngắn và kết luận đáp số rõ ràng. Mọi công thức phải nằm trong $...$ (công thức riêng dòng dùng $$...$$); chỉ dùng LaTeX đơn giản mà KaTeX hiển thị được, tuyệt đối không dùng \\hfill, không dùng ký tự toán Unicode rời rạc, không lặp lại công thức dạng chữ thường ngoài dấu $. Vectơ viết dạng $\\overrightarrow{OM}$, $\\vec{a}$. Nếu người dùng hỏi về câu hỏi/đề đang xem, hãy dựa vào ngữ cảnh sau nếu có:\n${ctx}`;
 }
 
 async function callOpenAICompatible({ url, key, model, messages, context, image }) {
@@ -40,7 +48,7 @@ async function callOpenAICompatible({ url, key, model, messages, context, image 
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.error?.message || `AI HTTP ${res.status}`);
-  return data?.choices?.[0]?.message?.content || '';
+  return cleanAiText(data?.choices?.[0]?.message?.content || '');
 }
 
 async function callGemini({ key, model, messages, context, image }) {
@@ -57,7 +65,7 @@ async function callGemini({ key, model, messages, context, image }) {
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.error?.message || `Gemini HTTP ${res.status}`);
-  return data?.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '';
+  return cleanAiText(data?.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '');
 }
 
 export default async function handler(req, res) {
