@@ -420,8 +420,8 @@ export default function App() {
   const [scopeChapters, setScopeChapters] = useState<{ name: string; count: number }[]>([]);
   const [scopeLessons, setScopeLessons] = useState<{ name: string; base: string; count: number }[]>([]);
   const [numCodes, setNumCodes] = useState(4);
-  const [levelNeed, setLevelNeed] = useState<Record<Level, number>>({ NB: 5, TH: 5, VD: 4, VDC: 2 });
-  const [partNeed, setPartNeed] = useState<Record<QType, number>>({ single: 8, tf: 3, short: 3, essay: 2 });
+  const [levelNeed, setLevelNeed] = useState<Record<Level, number>>({ NB: 7, TH: 7, VD: 6, VDC: 4 });
+  const [partNeed, setPartNeed] = useState<Record<QType, number>>({ single: 12, tf: 4, short: 4, essay: 4 });
   const [partPoints, setPartPoints] = useState<Record<QType, number>>({ single: 3, tf: 3, short: 2, essay: 2 });
   const [generated, setGenerated] = useState<GeneratedCode[]>([]);
   const [matrixMsg, setMatrixMsg] = useState('');
