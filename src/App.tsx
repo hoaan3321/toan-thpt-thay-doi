@@ -494,7 +494,12 @@ export default function App() {
   const [practiceMode, setPracticeMode] = useState<'vi' | 'en'>('vi');
   const [practiceGrade, setPracticeGrade] = useState('12');
   const [practiceLevel, setPracticeLevel] = useState('');
-  const [practiceQs, setPracticeQs] = useState<{ content: string; options: string[]; correctIndex: number; explanation: string }[]>([]);
+  const [practiceQs, setPracticeQs] = useState<{ content: string; options: string[]; correctIndex: number; explanation: string; meta?: string }[]>([]);
+  const [practiceCount, setPracticeCount] = useState(10);
+  const [practiceLesson, setPracticeLesson] = useState('');
+  const [practiceSeconds, setPracticeSeconds] = useState(0);
+  const [practiceWrongOnly, setPracticeWrongOnly] = useState(false);
+  const [practiceHistory, setPracticeHistory] = useState<{ date: string; mode: string; grade: string; correct: number; total: number; seconds: number }[]>(() => { try { return JSON.parse(localStorage.getItem('practice-history') || '[]'); } catch { return []; } });
   const [practiceAnswers, setPracticeAnswers] = useState<Record<number, number>>({});
   const [practiceChecked, setPracticeChecked] = useState(false);
   const [userFilter, setUserFilter] = useState<'all' | 'student' | 'teacher' | 'trial' | 'full' | 'english' | 'requested' | 'limited'>('all');
@@ -623,23 +628,44 @@ export default function App() {
     return idx >= 0 ? idx : 0;
   }
 
+  useEffect(() => {
+    if (!practiceQs.length || practiceChecked) return;
+    const t = setInterval(() => setPracticeSeconds((v) => v + 1), 1000);
+    return () => clearInterval(t);
+  }, [practiceQs.length, practiceChecked]);
+
+  function submitPractice() {
+    const correct = practiceQs.filter((q, i) => practiceAnswers[i] === q.correctIndex).length;
+    const entry = { date: new Date().toLocaleString('vi-VN'), mode: practiceMode === 'en' ? 'Tiếng Anh' : 'Tiếng Việt', grade: practiceGrade, correct, total: practiceQs.length, seconds: practiceSeconds };
+    const next = [entry, ...practiceHistory].slice(0, 20);
+    setPracticeHistory(next);
+    try { localStorage.setItem('practice-history', JSON.stringify(next)); } catch { /* ignore */ }
+    setPracticeChecked(true);
+  }
+
+  function retryWrong() {
+    const wrong = practiceQs.filter((q, i) => practiceAnswers[i] !== q.correctIndex);
+    if (!wrong.length) return;
+    setPracticeQs(wrong); setPracticeAnswers({}); setPracticeChecked(false); setPracticeSeconds(0); setPracticeWrongOnly(false);
+  }
+
   async function startPractice() {
-    setLoading(true); setError(''); setPracticeChecked(false); setPracticeAnswers({});
+    setLoading(true); setError(''); setPracticeChecked(false); setPracticeAnswers({}); setPracticeSeconds(0); setPracticeWrongOnly(false);
     try {
       if (practiceMode === 'en' && !hasEnglish) { setError('Toán tiếng Anh cần quyền truy cập hoặc đang dùng thử.'); return; }
       const table = practiceMode === 'en' ? 'english_questions' : 'questions';
-      const p = eqParams({ grade: practiceGrade, qtype: 'single', level: practiceLevel || undefined });
+      const p = eqParams({ grade: practiceGrade, qtype: 'single', level: practiceLevel || undefined, ...(practiceMode === 'en' ? { lesson_vi: practiceLesson || undefined } : { lesson: practiceLesson || undefined }) });
       const total = await supabaseCount(table, p, practiceMode === 'en');
       if (!total) { setPracticeQs([]); setError('Chưa có câu trắc nghiệm khớp lựa chọn.'); return; }
-      const offset = Math.floor(Math.random() * Math.max(1, total - 10));
-      p.set('select', '*'); p.set('limit', '30'); p.set('offset', String(offset));
+      const offset = Math.floor(Math.random() * Math.max(1, total - practiceCount));
+      p.set('select', '*'); p.set('limit', String(practiceCount * 3)); p.set('offset', String(offset));
       if (practiceMode === 'en') {
         const rows = await supabaseGet<EnglishQuestion[]>(table, p, true);
-        const qs = rows.filter((r) => r.options?.length >= 2).slice(0, 10).map((r) => ({ content: r.problem, options: r.options, correctIndex: correctIndexOf(r.answer, r.options), explanation: `${r.solution_en} ${r.solution_vi}` }));
+        const qs = [...rows].sort(() => Math.random() - 0.5).filter((r) => r.options?.length >= 2).slice(0, practiceCount).map((r) => ({ content: r.problem, options: r.options, correctIndex: correctIndexOf(r.answer, r.options), explanation: `${r.solution_en} ${r.solution_vi}`, meta: `${r.lesson_vi} • ${r.dang_vi} • ${r.level}` }));
         setPracticeQs(qs);
       } else {
         const rows = await supabaseGet<Question[]>(table, p);
-        const qs = rows.filter((r) => r.options?.length >= 2).slice(0, 10).map((r) => ({ content: stripSourcePrefix(r.content), options: r.options.map(stripOptionPrefix), correctIndex: correctIndexOf(r.correct, r.options), explanation: r.explanation || `Đáp án: ${r.correct}` }));
+        const qs = [...rows].sort(() => Math.random() - 0.5).filter((r) => r.options?.length >= 2).slice(0, practiceCount).map((r) => ({ content: stripSourcePrefix(r.content), options: r.options.map(stripOptionPrefix), correctIndex: correctIndexOf(r.correct, r.options), explanation: r.explanation || `Đáp án: ${r.correct}`, meta: `${r.lesson || ''} • ${r.dang} • ${r.level}` }));
         setPracticeQs(qs);
       }
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setLoading(false); }
@@ -1731,15 +1757,21 @@ export default function App() {
               <button className={practiceMode === 'vi' ? 'primary' : ''} onClick={() => setPracticeMode('vi')}>Toán tiếng Việt</button>
               <button className={practiceMode === 'en' ? 'primary' : ''} onClick={() => setPracticeMode('en')}>Toán tiếng Anh</button>
               <label>Lớp<select value={practiceGrade} onChange={(e) => setPracticeGrade(e.target.value)}><option>10</option><option>11</option><option>12</option></select></label>
+              <label>Bài<select value={practiceLesson} onChange={(e) => setPracticeLesson(e.target.value)}><option value="">Tất cả bài</option>{ENGLISH_LESSONS[Number(practiceGrade)].map((l) => <option key={l} value={l}>{l}</option>)}</select></label>
               <label>Mức độ<select value={practiceLevel} onChange={(e) => setPracticeLevel(e.target.value)}><option value="">Tất cả</option>{LEVELS.map((l) => <option key={l} value={l}>{l}</option>)}</select></label>
-              <button className="primary" onClick={() => void startPractice()}>Bắt đầu 10 câu</button>
+              <label>Số câu<select value={practiceCount} onChange={(e) => setPracticeCount(Number(e.target.value))}><option value={10}>10 câu</option><option value={20}>20 câu</option><option value={30}>30 câu</option></select></label>
+              <button className="primary" onClick={() => void startPractice()}>Bắt đầu {practiceCount} câu</button>
             </div>
             {practiceMode === 'en' && !hasEnglish && <p className="notice">Toán tiếng Anh cần đang dùng thử hoặc được quản trị cấp quyền.</p>}
+            {practiceQs.length > 0 && <p className="notice">Thời gian: {String(Math.floor(practiceSeconds / 60)).padStart(2, '0')}:{String(practiceSeconds % 60).padStart(2, '0')} • Đã làm {Object.keys(practiceAnswers).length}/{practiceQs.length} câu</p>}
             {practiceChecked && <p className="notice">Kết quả: {practiceQs.filter((q, i) => practiceAnswers[i] === q.correctIndex).length}/{practiceQs.length} câu đúng.</p>}
+            {practiceHistory.length > 0 && <p>Lịch sử luyện tập gần nhất: {practiceHistory.slice(0, 3).map((h) => `${h.mode} lớp ${h.grade}: ${h.correct}/${h.total}`).join(' • ')}</p>}
           </section>
-          {practiceQs.map((q, i) => (
+          {practiceQs.map((q, i) => ({ q, i })).filter(({ q, i }) => !practiceWrongOnly || practiceAnswers[i] !== q.correctIndex).map(({ q, i }) => (
             <section className="card" key={i}>
               <p><strong>Câu {i + 1}.</strong> <MathText text={q.content} /></p>
+              {q.meta && <p className="muted">{q.meta}</p>}
+              {practiceMode === 'en' && <button onClick={() => { const u = new SpeechSynthesisUtterance(q.content.replace(/\$/g, '')); u.lang = 'en-US'; u.rate = 0.9; speechSynthesis.speak(u); }}>🔊 Nghe câu hỏi</button>}
               {q.options.map((op, oi) => (
                 <label className="check" key={oi} style={practiceChecked ? { fontWeight: oi === q.correctIndex ? 700 : 400 } : undefined}>
                   <input type="radio" name={`pq-${i}`} checked={practiceAnswers[i] === oi} disabled={practiceChecked} onChange={() => setPracticeAnswers({ ...practiceAnswers, [i]: oi })} /> {'ABCD'[oi]}. <MathText text={op} />{practiceChecked && oi === q.correctIndex ? ' ✓' : practiceChecked && practiceAnswers[i] === oi ? ' ✗' : ''}
@@ -1748,8 +1780,8 @@ export default function App() {
               {practiceChecked && <p><strong>Lời giải:</strong> <MathText text={q.explanation} /></p>}
             </section>
           ))}
-          {practiceQs.length > 0 && !practiceChecked && <button className="primary" onClick={() => setPracticeChecked(true)}>Nộp bài</button>}
-          {practiceChecked && <button onClick={() => void startPractice()}>Làm bộ mới</button>}
+          {practiceQs.length > 0 && !practiceChecked && <button className="primary" onClick={submitPractice}>Nộp bài</button>}
+          {practiceChecked && <div className="filters"><button onClick={() => void startPractice()}>Làm bộ mới</button><button onClick={() => setPracticeWrongOnly(!practiceWrongOnly)}>{practiceWrongOnly ? 'Xem tất cả' : 'Chỉ xem câu sai'}</button><button onClick={retryWrong}>Luyện lại câu sai</button></div>}
         </main>
       )}
 
