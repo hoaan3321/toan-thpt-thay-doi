@@ -3,7 +3,7 @@ import MathText from './MathText';
 import { eqParams, getSession, ilike, isSupabaseConfigured, signIn, signOut, signUp, recoverPassword, resendConfirmation, updatePassword, supabaseCount, supabaseDelete, supabaseGet, supabaseInsert, supabaseUpdate, type AuthSession } from './supabase';
 import { LEVELS, QTYPES, QTYPE_LABEL, type Assignment, type ClassRecord, type ExamRecord, type Level, type QType, type Question, type StudentRecord, type Submission, type TheoryNote } from './types';
 
-type Tab = 'overview' | 'bank' | 'theory' | 'english' | 'matrix' | 'print' | 'assign' | 'take' | 'results' | 'admin' | 'users' | 'practice';
+type Tab = 'overview' | 'bank' | 'theory' | 'english' | 'matrix' | 'print' | 'assign' | 'take' | 'results' | 'admin' | 'users' | 'practice' | 'news';
 
 interface GeneratedCode {
   code: number;
@@ -42,6 +42,21 @@ interface Profile {
 }
 
 interface EnglishVocabulary { id: string; grade: number; lesson: string; lesson_vi: string; term: string; meaning: string; freq: number; ipa?: string; }
+
+
+const NEWS_SOURCES = [
+  { title: 'Tin tức Bộ Giáo dục và Đào tạo', desc: 'Tin hoạt động của Bộ, thông cáo báo chí, tin tổng hợp giáo dục.', url: 'https://moet.gov.vn/tin-tuc' },
+  { title: 'Giáo dục trung học', desc: 'Tin và văn bản liên quan bậc trung học, trường phổ thông, sách giáo khoa.', url: 'https://moet.gov.vn/chuyen-de-giao-duc-va-dao-tao/giao-duc-trung-hoc?menuId=Article.DraftText&categoryId=15165247' },
+  { title: 'Thi tốt nghiệp THPT và chính sách giáo dục', desc: 'Dự thảo quy chế thi, chính sách đột phá phát triển giáo dục.', url: 'https://moet.gov.vn/tin-tuc/nganh-giao-duc-thuc-hien-nghi-quyet-71-nq-tw-ve-dot-pha-phat-trien-giao-duc-va-dao-tao' },
+];
+
+const NEWS_ITEMS = [
+  { title: 'Dự thảo Thông tư ban hành Quy chế thi tốt nghiệp THPT', date: '26/11/2026', tag: 'Thi tốt nghiệp', desc: 'Bộ GDĐT đăng tải dự thảo Thông tư Quy chế thi tốt nghiệp THPT để lấy ý kiến góp ý, tăng cường an ninh, an toàn kỳ thi.', url: 'https://moet.gov.vn/tin-tuc/nganh-giao-duc-thuc-hien-nghi-quyet-71-nq-tw-ve-dot-pha-phat-trien-giao-duc-va-dao-tao' },
+  { title: 'Hội thảo Giáo dục 2026: Hoàn thiện chính sách, bảo đảm nguồn lực', date: '27/11/2026', tag: 'Chính sách', desc: 'Hội thảo tại Nhà Quốc hội về cơ chế, chính sách và nguồn lực thực hiện đột phá phát triển giáo dục và đào tạo.', url: 'https://moet.gov.vn/tin-tuc' },
+  { title: 'Công văn hướng dẫn xây dựng văn hóa học đường', date: '2026', tag: 'Công văn', desc: 'Công văn của Bộ GDĐT hướng dẫn tổ chức Ngày Văn hóa Việt Nam gắn với xây dựng văn hóa học đường, gửi các sở GDĐT và cơ sở giáo dục.', url: 'https://moet.gov.vn/upload/2007219/20261103/30_10_26_cong-van-huong-dan-chi-thi-35-bgddt_2012_30101545_signed_5742_01111914_signed_4075_02110916_signed_5673_5cae3.pdf' },
+  { title: '25 năm giáo dục hòa nhập tại Việt Nam', date: '26/11/2026', tag: 'Tin Bộ', desc: 'Hội thảo kỷ niệm 25 năm giáo dục hòa nhập, nhìn lại kết quả và định hướng phát triển trong thời gian tới.', url: 'https://moet.gov.vn/tin-tuc' },
+  { title: 'Thông tư về SGK điện tử và dạy thêm, học thêm', date: '2026', tag: 'Trung học', desc: 'Tin giáo dục trung học: quy định chuyển thể SGK bản in sang SGK điện tử; sửa đổi quy định về dạy thêm, học thêm.', url: 'https://moet.gov.vn/chuyen-de-giao-duc-va-dao-tao/giao-duc-trung-hoc?menuId=Article.DraftText&categoryId=15165247' },
+];
 
 const ENGLISH_LESSONS: Record<number, string[]> = {
   10: ['Mệnh đề','Tập hợp','Các phép toán trên tập hợp','Bất phương trình bậc nhất hai ẩn','Hệ bất phương trình bậc nhất hai ẩn','Giá trị lượng giác của một góc từ 0° đến 180°','Hệ thức lượng trong tam giác','Các khái niệm mở đầu','Tổng và hiệu của hai vectơ','Tích của một vectơ với một số','Vectơ trong mặt phẳng tọa độ','Tích vô hướng của hai vectơ','Số gần đúng và sai số','Các số đặc trưng đo xu thế trung tâm','Các số đặc trưng đo độ phân tán','Hàm số','Hàm số bậc hai','Dấu của tam thức bậc hai','Phương trình quy về phương trình bậc hai','Phương trình đường thẳng','Vị trí tương đối giữa hai đường thẳng. Góc và khoảng cách','Đường tròn trong mặt phẳng tọa độ','Ba đường conic','Quy tắc đếm','Hoán vị, chỉnh hợp và tổ hợp','Nhị thức Newton','Biến cố và định nghĩa cổ điển của xác suất','Thực hành tính xác suất theo định nghĩa cổ điển','Hệ phương trình bậc nhất ba ẩn','Phương pháp quy nạp toán học. Nhị thức Newton','Ba đường conic và ứng dụng'],
@@ -499,6 +514,7 @@ export default function App() {
   const [practiceLesson, setPracticeLesson] = useState('');
   const [practiceSeconds, setPracticeSeconds] = useState(0);
   const [practiceWrongOnly, setPracticeWrongOnly] = useState(false);
+  const [newsQuery, setNewsQuery] = useState('');
   const [practiceHistory, setPracticeHistory] = useState<{ date: string; mode: string; grade: string; correct: number; total: number; seconds: number }[]>(() => { try { return JSON.parse(localStorage.getItem('practice-history') || '[]'); } catch { return []; } });
   const [practiceAnswers, setPracticeAnswers] = useState<Record<number, number>>({});
   const [practiceChecked, setPracticeChecked] = useState(false);
@@ -1449,7 +1465,7 @@ export default function App() {
           <button className="install-btn" onClick={() => void installApp()}>📲 Cài ứng dụng</button>
         </div>
         <nav>
-          {([['overview', 'Tổng quan'], ['bank', 'Ngân hàng câu hỏi'], ['theory', 'Lý thuyết'], ['english', 'Toán tiếng Anh'], ['matrix', 'Tạo đề'], ['print', 'In đề'], ['assign', 'Giao bài'], ['take', 'Học sinh làm bài'], ['results', 'Kết quả'], ['practice', 'Tự luyện'], ['admin', 'Quản trị'], ...(isAdmin ? [['users', 'Quản lý người dùng'] as [Tab, string]] : [])] as [Tab, string][]).map(([t, label]) => (
+          {([['overview', 'Tổng quan'], ['bank', 'Ngân hàng câu hỏi'], ['theory', 'Lý thuyết'], ['english', 'Toán tiếng Anh'], ['matrix', 'Tạo đề'], ['print', 'In đề'], ['assign', 'Giao bài'], ['take', 'Học sinh làm bài'], ['results', 'Kết quả'], ['practice', 'Tự luyện'], ['news', 'Tin giáo dục'], ['admin', 'Quản trị'], ...(isAdmin ? [['users', 'Quản lý người dùng'] as [Tab, string]] : [])] as [Tab, string][]).map(([t, label]) => (
             <button key={t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)}>{label}</button>
           ))}
         </nav>
@@ -1782,6 +1798,26 @@ export default function App() {
           ))}
           {practiceQs.length > 0 && !practiceChecked && <button className="primary" onClick={submitPractice}>Nộp bài</button>}
           {practiceChecked && <div className="filters"><button onClick={() => void startPractice()}>Làm bộ mới</button><button onClick={() => setPracticeWrongOnly(!practiceWrongOnly)}>{practiceWrongOnly ? 'Xem tất cả' : 'Chỉ xem câu sai'}</button><button onClick={retryWrong}>Luyện lại câu sai</button></div>}
+        </main>
+      )}
+
+      {tab === 'news' && (
+        <main>
+          <section className="card"><h2>Tin giáo dục và công văn</h2>
+            <p>Tin và văn bản từ nguồn chính thức của Bộ Giáo dục và Đào tạo. Bấm vào từng mục để mở trang gốc.</p>
+            <div className="filters"><label>Tìm tin<input value={newsQuery} onChange={(e) => setNewsQuery(e.target.value)} placeholder="Ví dụ: công văn, thi tốt nghiệp, trung học" /></label></div>
+          </section>
+          <section className="card"><h3>Nguồn chính thức</h3>
+            {NEWS_SOURCES.map((n) => (<p key={n.url}><a href={n.url} target="_blank" rel="noreferrer"><strong>{n.title}</strong></a> — {n.desc}</p>))}
+          </section>
+          {NEWS_ITEMS.filter((n) => !newsQuery || `${n.title} ${n.tag} ${n.desc}`.toLowerCase().includes(newsQuery.toLowerCase())).map((n) => (
+            <section className="card" key={n.title}>
+              <p><strong>{n.title}</strong></p>
+              <p className="muted">{n.date} • {n.tag} • Bộ Giáo dục và Đào tạo</p>
+              <p>{n.desc}</p>
+              <p><a href={n.url} target="_blank" rel="noreferrer">Mở nguồn chính thức</a></p>
+            </section>
+          ))}
         </main>
       )}
 
