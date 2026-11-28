@@ -955,7 +955,7 @@ export default function App() {
       }
       const lessons = [...lessonMap.values()];
       const chapters = [...chapterMap.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => a.name.localeCompare(b.name, 'vi'));
-      lessons.sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+      lessons.sort((a, b) => { const ia = ENGLISH_LESSONS[mGrade].indexOf(lessonTitle(a.name)); const ib = ENGLISH_LESSONS[mGrade].indexOf(lessonTitle(b.name)); if (ia >= 0 && ib >= 0) return ia - ib; if (ia >= 0) return -1; if (ib >= 0) return 1; return a.name.localeCompare(b.name, 'vi'); });
       setScopeChapters(chapters);
       setScopeLessons(lessons);
       if (!mChapter && chapters[0]) setMChapter(chapters[0].name);
