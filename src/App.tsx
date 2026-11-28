@@ -550,11 +550,11 @@ function distributeByWeights(total: number, weights: number[]): number[] {
 
 function standardCells(levelNeed: Record<Level, number>, partNeed: Record<QType, number>, partPoints: Record<QType, number>): Record<Level, Record<QType, number>> | null {
   if (partNeed.single !== 12 || partNeed.tf !== 4 || partNeed.short !== 4 || partNeed.essay !== 4) return null;
-  if (partPoints.single !== 3 || partPoints.tf !== 3 || partPoints.short !== 2 || partPoints.essay !== 2) return null;
+  if (partPoints.single !== 3 || partPoints.tf !== 2 || partPoints.short !== 2 || partPoints.essay !== 3) return null;
   if (levelNeed.NB !== 12 || levelNeed.TH !== 7 || levelNeed.VD !== 3 || levelNeed.VDC !== 2) return null;
   return {
-    NB: { single: 8, tf: 0, short: 2, essay: 2 },
-    TH: { single: 4, tf: 2, short: 1, essay: 0 },
+    NB: { single: 9, tf: 0, short: 2, essay: 1 },
+    TH: { single: 3, tf: 2, short: 1, essay: 1 },
     VD: { single: 0, tf: 1, short: 1, essay: 1 },
     VDC: { single: 0, tf: 1, short: 0, essay: 1 },
   };
@@ -660,8 +660,7 @@ export default function App() {
   const [numCodes, setNumCodes] = useState(4);
   const [levelNeed, setLevelNeed] = useState<Record<Level, number>>({ NB: 12, TH: 7, VD: 3, VDC: 2 });
   const [partNeed, setPartNeed] = useState<Record<QType, number>>({ single: 12, tf: 4, short: 4, essay: 4 });
-  const [partPoints, setPartPoints] = useState<Record<QType, number>>({ single: 3, tf: 3, short: 2, essay: 2 });
-  const [compPct, setCompPct] = useState<{ tuDuy: number; giaiQuyet: number; moHinh: number }>({ tuDuy: 40, giaiQuyet: 35, moHinh: 25 });
+  const [partPoints, setPartPoints] = useState<Record<QType, number>>({ single: 3, tf: 2, short: 2, essay: 3 });
   const [lessonPeriods, setLessonPeriods] = useState<Record<string, number>>({});
   const [generated, setGenerated] = useState<GeneratedCode[]>([]);
   const [matrixMsg, setMatrixMsg] = useState('');
@@ -2191,13 +2190,17 @@ export default function App() {
               { label: 'Hiểu (Thông hiểu)', pts: ptsByLevel(['TH']), target: 30 },
               { label: 'Vận dụng', pts: ptsByLevel(['VD', 'VDC']), target: 30 },
             ];
-            const compSum = Math.max(1, compPct.tuDuy + compPct.giaiQuyet + compPct.moHinh);
+            const nbPts = ptsByLevel(['NB']);
+            const thPts = ptsByLevel(['TH']);
+            const vdPts = ptsByLevel(['VD']);
+            const vdcPts = ptsByLevel(['VDC']);
             const compRows = [
-              { key: 'tuDuy' as const, label: 'Tư duy & lập luận toán học' },
-              { key: 'giaiQuyet' as const, label: 'Giải quyết vấn đề toán học' },
-              { key: 'moHinh' as const, label: 'Mô hình hóa toán học' },
+              { label: 'Tư duy & lập luận toán học', pts: nbPts + thPts / 2 },
+              { label: 'Giải quyết vấn đề toán học', pts: thPts / 2 + vdPts },
+              { label: 'Mô hình hóa toán học', pts: vdcPts },
             ];
-            const compCounts = distributeByWeights(totalQ, compRows.map((r) => compPct[r.key]));
+            const compCounts = distributeByWeights(totalQ, compRows.map((r) => r.pts));
+            const tnkqPts = (partNeed.single > 0 ? partPoints.single : 0) + (partNeed.tf > 0 ? partPoints.tf : 0) + (partNeed.short > 0 ? partPoints.short : 0);
             const scopeListRaw = scopeLessons.filter((l) => scopeMode === 'all' || (scopeMode === 'chapter' ? selectedChapters.includes(baseChapter(l.name)) : selectedLessons.includes(l.name)));
             const scopeList = scopeListRaw.length ? scopeListRaw : ENGLISH_LESSONS[mGrade].map((name) => ({ name, base: '', count: 0 }));
             const totalPeriods = scopeList.reduce((a, l) => a + (lessonPeriods[lessonTitle(l.name) || l.name] ?? 1), 0);
@@ -2215,24 +2218,23 @@ export default function App() {
                         <small>mục tiêu {r.target}%</small>
                       </div>
                     ))}
-                    <p className="muted">Chuẩn công văn: 40% Nhận biết – 30% Thông hiểu – 30% Vận dụng.</p>
+                    <p className="muted">Theo Công văn 7991/BGDĐT-GDTrH: Nhận biết khoảng 40% – Thông hiểu khoảng 30% – Vận dụng khoảng 30% điểm; trắc nghiệm khách quan {totalPts > 0 ? `${((tnkqPts / totalPts) * 100).toFixed(0)}%` : '—'} – Tự luận {totalPts > 0 ? `${(((totalPts - tnkqPts) / totalPts) * 100).toFixed(0)}%` : '—'} (chuẩn 70% – 30%).</p>
                   </div>
                   <div className="ratio-card">
-                    <h4>Tỉ lệ năng lực toán học (%)</h4>
+                    <h4>Tỉ lệ năng lực toán học (tự tính)</h4>
                     {compRows.map((r, i) => (
-                      <div className="ratio-row" key={r.key}>
+                      <div className="ratio-row" key={r.label}>
                         <span>{r.label}</span>
-                        <input type="number" min={0} max={100} value={compPct[r.key]} onChange={(e) => setCompPct({ ...compPct, [r.key]: Math.max(0, Math.min(100, Number(e.target.value))) })} aria-label={`Tỉ lệ ${r.label}`} />
-                        <strong>{compCounts[i]} câu</strong>
-                        <small>{fmtPoints((compPct[r.key] / compSum) * totalPts)} điểm</small>
+                        <strong>{totalPts > 0 ? `${((r.pts / totalPts) * 100).toFixed(1).replace('.', ',')}%` : '—'}</strong>
+                        <small>{compCounts[i]} câu · {fmtPoints(r.pts)} điểm</small>
                       </div>
                     ))}
-                    <p className="muted">Tỉ lệ mục tiêu để phân bổ số câu/điểm theo năng lực; hệ thống tự quy về 100%.</p>
+                    <p className="muted">Tự tính từ mức độ của ma trận: Nhận biết và một nửa Thông hiểu → Tư duy & lập luận; một nửa Thông hiểu và Vận dụng → Giải quyết vấn đề; Vận dụng cao → Mô hình hóa.</p>
                   </div>
                   <div className="ratio-card">
                     <h4>Điểm theo số tiết học</h4>
                     <p>Tổng số tiết phạm vi: <strong>{totalPeriods || '—'}</strong> · Điểm/tiết: <strong>{totalPeriods > 0 ? fmtPoints(totalPts / totalPeriods) : '—'}</strong> · Câu/tiết: <strong>{totalPeriods > 0 ? (totalQ / totalPeriods).toFixed(2).replace('.', ',') : '—'}</strong></p>
-                    <p className="muted">Ma trận phân bổ câu/điểm cho từng bài theo tỉ lệ số tiết bên dưới (bài nhiều tiết được nhiều điểm hơn).</p>
+                    <p className="muted">App tự tính % điểm từng bài = số tiết của bài ÷ tổng số tiết × tổng điểm, rồi phân bổ câu/điểm vào ma trận theo tỉ lệ đó. Thầy chỉ cần đúng số tiết theo phân phối chương trình của trường.</p>
                   </div>
                 </div>
                 {scopeList.length > 0 ? (
