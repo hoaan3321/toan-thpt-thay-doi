@@ -1605,7 +1605,7 @@ export default function App() {
     return qs.reduce((s, q) => s + Number(q.points || 0), 0);
   }
 
-  function exportDocx(kind: 'de' | 'dapan' = 'de') {
+  function examDocxBlob(kind: 'de' | 'dapan' = 'de'): Blob {
     const enc = new TextEncoder();
     const run = (text: string, bold = false, size = 24) => `<w:r><w:rPr>${bold ? '<w:b/>' : ''}<w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"/><w:sz w:val="${size}"/></w:rPr><w:t xml:space="preserve">${xmlEscape(text)}</w:t></w:r>`;
     const richRuns = (text: string, bold = false, size = 24): string => {
@@ -1647,13 +1647,77 @@ export default function App() {
     const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>`;
     const rels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`;
     const docRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`;
-    downloadBlob(kind === 'dapan' ? 'dap-an.docx' : 'de-toan.docx', zipStore([
+    return zipStore([
       { name: '[Content_Types].xml', data: enc.encode(contentTypes) },
       { name: '_rels/.rels', data: enc.encode(rels) },
       { name: 'word/document.xml', data: enc.encode(documentXml) },
       { name: 'word/styles.xml', data: enc.encode(stylesXml) },
       { name: 'word/_rels/document.xml.rels', data: enc.encode(docRels) },
-    ]));
+    ]);
+  }
+
+  function exportDocx(kind: 'de' | 'dapan' = 'de') {
+    downloadBlob(kind === 'dapan' ? 'dap-an.docx' : 'de-toan.docx', examDocxBlob(kind));
+  }
+
+  function matrixExportData() {
+    const cap = {} as Record<Level, Record<QType, number>>;
+    for (const l of LEVELS) { cap[l] = {} as Record<QType, number>; for (const q of QTYPES) cap[l][q] = 999; }
+    const cells = standardCells(levelNeed, partNeed, partPoints) ?? buildCellCounts(levelNeed, partNeed, cap);
+    const groups: { key: string; label: string; levels: Level[] }[] = [{ key: 'B', label: 'Biết', levels: ['NB'] }, { key: 'H', label: 'Hiểu', levels: ['TH'] }, { key: 'VD', label: 'VD', levels: ['VD', 'VDC'] }];
+    const lessonsAll = scopeLessons.filter((l) => scopeMode === 'all' || (scopeMode === 'chapter' ? selectedChapters.includes(baseChapter(l.name)) : selectedLessons.includes(l.name)));
+    const lessons = lessonsAll.length ? lessonsAll : [{ name: lessonTitle(mLesson) || `Toàn khối ${mGrade}`, count: 0 }];
+    const dist: Record<string, number>[] = lessons.map(() => ({}));
+    if (cells) { let seed = 0; for (const q of QTYPES) { for (const g of groups) { const total = g.levels.reduce((a, l) => a + cells[l][q], 0); for (let i = 0; i < total; i++) { const idx = (seed + i) % lessons.length; dist[idx][`${q}|${g.key}`] = (dist[idx][`${q}|${g.key}`] ?? 0) + 1; } seed += 1; } } }
+    const totalPts = QTYPES.reduce((a, q) => a + (partNeed[q] > 0 ? partPoints[q] : 0), 0);
+    const ptsOf = (i: number, q: QType, gk: string) => (partNeed[q] > 0 ? (dist[i][`${q}|${gk}`] ?? 0) * (partPoints[q] / partNeed[q]) : 0);
+    const pct = (v: number) => `${(totalPts > 0 ? (v / totalPts) * 100 : 0).toFixed(1).replace('.', ',')}%`;
+    return { cells, groups, lessons, dist, totalPts, ptsOf, pct };
+  }
+
+  function tableDocxBlob(title: string, rows: string[][]): Blob {
+    const enc = new TextEncoder();
+    const run = (text: string, bold = false) => `<w:r><w:rPr>${bold ? '<w:b/>' : ''}<w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"/><w:sz w:val="20"/></w:rPr><w:t xml:space="preserve">${xmlEscape(text)}</w:t></w:r>`;
+    const para = (text: string, bold = false, align = '') => `<w:p><w:pPr>${align ? `<w:jc w:val="${align}"/>` : ''}<w:spacing w:after="40"/></w:pPr>${run(text, bold)}</w:p>`;
+    const cell = (text: string, bold = false) => `<w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4"/><w:left w:val="single" w:sz="4"/><w:bottom w:val="single" w:sz="4"/><w:right w:val="single" w:sz="4"/></w:tcBorders></w:tcPr>${para(text, bold)}</w:tc>`;
+    const table = `<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/></w:tblPr>${rows.map((r, i) => `<w:tr>${r.map((c) => cell(c, i === 0)).join('')}</w:tr>`).join('')}</w:tbl>`;
+    const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${para(title, true, 'center')}${para(`Toán lớp ${mGrade} · ${examDateTime()}`, false, 'center')}${table}<w:sectPr><w:pgSz w:w="16838" w:h="11906" w:orient="landscape"/><w:pgMar w:top="720" w:right="720" w:bottom="720" w:left="720"/></w:sectPr></w:body></w:document>`;
+    const stylesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"/><w:sz w:val="20"/></w:rPr></w:style></w:styles>`;
+    const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>`;
+    const rels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`;
+    const docRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`;
+    return zipStore([{ name: '[Content_Types].xml', data: enc.encode(contentTypes) }, { name: '_rels/.rels', data: enc.encode(rels) }, { name: 'word/document.xml', data: enc.encode(documentXml) }, { name: 'word/styles.xml', data: enc.encode(stylesXml) }, { name: 'word/_rels/document.xml.rels', data: enc.encode(docRels) }]);
+  }
+
+  function matrixDocxBlob(): Blob {
+    const { cells, groups, lessons, dist, totalPts, ptsOf, pct } = matrixExportData();
+    const rows: string[][] = [['TT', 'Chương/chủ đề', 'Nội dung/đơn vị kiến thức', 'Biết', 'Hiểu', 'VD', 'Tổng câu', 'Tỉ lệ % điểm']];
+    lessons.forEach((l, i) => { const lp = QTYPES.reduce((a, q) => a + groups.reduce((b, g) => b + ptsOf(i, q, g.key), 0), 0); rows.push([String(i + 1), baseChapter(l.name) || l.name, lessonTitle(l.name) || l.name, ...groups.map((g) => String(QTYPES.reduce((a, q) => a + (dist[i][`${q}|${g.key}`] ?? 0), 0) || '')), String(QTYPES.reduce((a, q) => a + groups.reduce((b, g) => b + (dist[i][`${q}|${g.key}`] ?? 0), 0), 0)), pct(lp)]); });
+    rows.push(['', '', 'Tổng số câu', ...groups.map((g) => String(g.levels.reduce((a, l) => a + levelNeed[l], 0))), String(QTYPES.reduce((a, q) => a + partNeed[q], 0)), '100%']);
+    rows.push(['', '', 'Tổng số điểm', ...groups.map((g) => fmtPoints(QTYPES.reduce((a, q) => a + (partNeed[q] > 0 && cells ? g.levels.reduce((b, l) => b + cells[l][q], 0) * (partPoints[q] / partNeed[q]) : 0), 0))), fmtPoints(totalPts), '']);
+    return tableDocxBlob('MA TRẬN ĐỀ KIỂM TRA', rows);
+  }
+
+  function specDocxBlob(): Blob {
+    const { groups, lessons, dist } = matrixExportData();
+    const codeOf: Record<QType, string> = { single: 'TNNLC', tf: 'TNĐS', short: 'TLN', essay: 'TL' };
+    const yeuCau: Record<string, string> = { B: 'Nhận biết: nhận biết được các khái niệm, định nghĩa, tính chất cơ bản của nội dung.', H: 'Thông hiểu: hiểu và áp dụng trực tiếp kiến thức, tính chất vào bài toán quen thuộc.', VD: 'Vận dụng: vận dụng kiến thức để giải quyết bài toán, kể cả bài toán thực tiễn.' };
+    const rows: string[][] = [['STT', 'Chương/chủ đề', 'Nội dung', 'Mức độ kiểm tra, đánh giá', 'Nhận biết', 'Thông hiểu', 'Vận dụng']];
+    lessons.forEach((l, i) => rows.push([String(i + 1), baseChapter(l.name) || l.name, lessonTitle(l.name) || l.name, groups.filter((g) => QTYPES.some((q) => (dist[i][`${q}|${g.key}`] ?? 0) > 0)).map((g) => yeuCau[g.key]).join(' '), ...groups.map((g) => QTYPES.filter((q) => (dist[i][`${q}|${g.key}`] ?? 0) > 0).map((q) => `${dist[i][`${q}|${g.key}`]}${codeOf[q]}`).join(' '))]));
+    return tableDocxBlob('BẢNG ĐẶC TẢ ĐỀ KIỂM TRA', rows);
+  }
+
+  async function downloadExamBundle() {
+    if (!generated.length) { setMatrixMsg('Hãy sinh mã đề trước khi tải bộ đề.'); return; }
+    const files = [
+      { name: 'de-toan.docx', blob: examDocxBlob('de') },
+      { name: 'ma-tran-de.docx', blob: matrixDocxBlob() },
+      { name: 'bang-dac-ta.docx', blob: specDocxBlob() },
+    ];
+    const entries: { name: string; data: Uint8Array }[] = [];
+    for (const f of files) entries.push({ name: f.name, data: new Uint8Array(await f.blob.arrayBuffer()) });
+    downloadBlob('bo-de-ma-tran-dac-ta.zip', zipStore(entries));
+    setMatrixMsg('Đã tải bộ đề gồm đề, ma trận và bảng đặc tả.');
   }
 
   function exportLatex(kind: 'de' | 'dapan' = 'de') {
@@ -2095,6 +2159,7 @@ export default function App() {
             <label>Lớp giao bài<select value={selectedClassId} onChange={(e) => setSelectedClassId(e.target.value)}><option value="">Không gắn lớp</option>{classes.map((c) => <option key={c.id} value={c.id}>{c.name} — lớp {c.grade}</option>)}</select></label>
             <button className="primary" onClick={() => void saveGeneratedAsAssignment(false)} disabled={!generated.length}>Lưu đề</button>
             <button onClick={() => void saveGeneratedAsAssignment(true)} disabled={!generated.length}>Lưu & giao bài</button>
+            <button className="primary" onClick={() => void downloadExamBundle()} disabled={!generated.length}>Tải đề + ma trận + đặc tả</button>
             <button onClick={() => exportDocx('de')} disabled={!generated.length}>Xuất đề DOCX</button>
             <button onClick={() => exportDocx('dapan')} disabled={!generated.length}>Xuất đáp án DOCX</button>
             <button onClick={() => exportPdf('de')} disabled={!generated.length}>Xuất đề PDF</button>
@@ -2141,6 +2206,7 @@ export default function App() {
       {tab === 'print' && (
         <main>
           <div className="no-print filters">
+            <button className="primary" onClick={() => void downloadExamBundle()} disabled={!generated.length}>Tải đề + ma trận + đặc tả</button>
             <button className="primary" onClick={() => exportPdf('de')}>In đề / Xuất PDF</button>
             <button onClick={() => exportPdf('dapan')}>In đáp án / Xuất PDF</button>
             <button onClick={() => exportDocx('de')} disabled={!generated.length}>Xuất đề DOCX</button>
