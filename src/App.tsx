@@ -2079,7 +2079,7 @@ export default function App() {
                 <p className="meta">ID {p.id} · Grade {p.grade} · Bài: {p.lesson_vi} ({p.lesson}) · Dạng: {p.dang_vi} ({p.dang}) · Mức: {p.level} · {QTYPE_LABEL[p.qtype]}{p.interesting ? ' · Câu hay' : ''}</p>
                 <h2>{p.title}</h2>
                 <div className="content"><MathText text={p.problem} /></div>
-                {p.options?.length > 0 && <ol className={`options-grid cols-${optionLayout(p.options)}`}>{p.options.map((op, i) => <li key={i}><MathText text={`${'ABCD'[i]}. ${stripOptionPrefix(op)}`} /></li>)}</ol>}
+                {p.options?.length > 0 && <div className={`options-grid cols-${optionLayout(p.options)}`}>{p.options.map((op, i) => <span key={i}><strong>{'ABCD'[i]}.</strong> <MathText text={stripOptionPrefix(op)} /></span>)}</div>}
                 <div className="vocab-row">{(p.vocabulary ?? []).map((v) => <span className="vocab-chip" key={v.term}><strong>{v.term}</strong>: {v.meaning}</span>)}</div>
                 <div className="filters no-print">
                   <button className={open ? '' : 'primary'} onClick={() => setEnglishOpenId(open && !englishShowAllSolutions ? null : p.id)}>{open ? 'Ẩn lời giải' : 'Xem đáp án & lời giải'}</button>
@@ -2299,7 +2299,7 @@ export default function App() {
               <p className="meta">Câu {i + 1} · {QTYPE_LABEL[q.qtype]} · {fmtPoints(Number(q.points || 0))} điểm</p>
               <div className="content"><MathText text={q.content} /></div>
               {q.image_url && <img className="figure" src={q.image_url} alt="Hình minh họa" />}
-              {q.qtype === 'single' && <div className="choices">{(q.options ?? []).map((op, oi) => <label className="check" key={oi}><input type="radio" name={`q-${q.id}`} checked={Number(answers[String(q.id)]) === oi} onChange={() => setAnswers({ ...answers, [String(q.id)]: oi })} /> <MathText text={op} /></label>)}</div>}
+              {q.qtype === 'single' && <div className="choices">{(q.options ?? []).map((op, oi) => <label className="check" key={oi}><input type="radio" name={`q-${q.id}`} checked={Number(answers[String(q.id)]) === oi} onChange={() => setAnswers({ ...answers, [String(q.id)]: oi })} /> <strong>{'ABCD'[oi] ?? oi + 1}.</strong> <MathText text={stripOptionPrefix(op)} /></label>)}</div>}
               {q.qtype === 'tf' && <div className="filters">{['a', 'b', 'c', 'd'].map((k) => <label key={k}>Ý {k}<select value={String(((answers[String(q.id)] as Record<string, string> | undefined)?.[k]) ?? '')} onChange={(e) => setAnswers({ ...answers, [String(q.id)]: { ...((answers[String(q.id)] as Record<string, string> | undefined) ?? {}), [k]: e.target.value } })}><option value="">Chọn</option><option>Đúng</option><option>Sai</option></select></label>)}</div>}
               {q.qtype === 'short' && <label className="field">Đáp án<input value={String(answers[String(q.id)] ?? '')} onChange={(e) => setAnswers({ ...answers, [String(q.id)]: e.target.value })} /></label>}
               {q.qtype === 'essay' && <label className="field">Bài làm tự luận<textarea rows={6} value={String(answers[String(q.id)] ?? '')} onChange={(e) => setAnswers({ ...answers, [String(q.id)]: e.target.value })} /></label>}
@@ -2557,7 +2557,7 @@ function QuestionCard({ q, showAnswers }: { q: Question; showAnswers: boolean })
       <p className="meta">ID {q.id} · Lớp {q.grade} · {q.chapter} · Bài: {q.lesson || '—'} · Dạng: {q.dang} · {q.level} · {QTYPE_LABEL[q.qtype]} · {q.points} điểm</p>
       <div className="content"><MathText text={q.content} /></div>
       {q.image_url && <img className="figure" src={q.image_url} alt="Hình minh họa" />}
-      {q.options?.length > 0 && <ol className="options">{q.options.map((op, i) => <li key={i}><MathText text={op} /></li>)}</ol>}
+      {q.options?.length > 0 && <div className={`options-grid cols-${optionLayout(q.options)}`}>{q.options.map((op, i) => <span key={i}><strong>{'ABCD'[i] ?? i + 1}.</strong> <MathText text={stripOptionPrefix(op)} /></span>)}</div>}
       {showAnswers && (
         <div className="answer">
           <p><strong>Đáp án:</strong> <MathText text={q.correct} /></p>
