@@ -3,7 +3,7 @@ import MathText from './MathText';
 import { eqParams, getSession, ilike, isSupabaseConfigured, signIn, signOut, signUp, recoverPassword, resendConfirmation, updatePassword, supabaseCount, supabaseDelete, supabaseGet, supabaseInsert, supabaseUpdate, type AuthSession } from './supabase';
 import { LEVELS, QTYPES, QTYPE_LABEL, type Assignment, type ClassRecord, type ExamRecord, type Level, type QType, type Question, type StudentRecord, type Submission, type TheoryNote } from './types';
 
-type Tab = 'overview' | 'bank' | 'theory' | 'english' | 'matrix' | 'print' | 'assign' | 'take' | 'results' | 'admin' | 'users' | 'practice' | 'news' | 'games';
+type Tab = 'overview' | 'bank' | 'theory' | 'english' | 'matrix' | 'print' | 'assign' | 'take' | 'results' | 'admin' | 'users' | 'practice' | 'news' | 'games' | 'payment';
 
 interface GeneratedCode {
   code: number;
@@ -42,6 +42,23 @@ interface Profile {
 }
 
 interface EnglishVocabulary { id: string; grade: number; lesson: string; lesson_vi: string; term: string; meaning: string; freq: number; ipa?: string; }
+
+interface PaymentRequest {
+  id: number;
+  user_id: string;
+  email: string;
+  package_days: number;
+  amount: number;
+  status: 'pending' | 'approved' | 'rejected' | 'paid';
+  note: string;
+  created_at: string;
+  approved_at?: string | null;
+}
+
+const PAYMENT_PACKAGES = [
+  { days: 7, amount: 49000, label: 'Gói 7 ngày', desc: 'Gia hạn full tính năng trong 7 ngày.' },
+  { days: 30, amount: 99000, label: 'Gói 30 ngày', desc: 'Gia hạn full tính năng trong 30 ngày, tiết kiệm hơn gói 7 ngày.' },
+];
 
 
 const NEWS_SOURCES = [
@@ -528,6 +545,7 @@ export default function App() {
   const [grade, setGrade] = useState(12);
   const [chapter, setChapter] = useState('');
   const [dang, setDang] = useState('');
+  const [bankLesson, setBankLesson] = useState('');
   const [level, setLevel] = useState('');
   const [qtype, setQtype] = useState('');
   const [search, setSearch] = useState('');
@@ -581,6 +599,9 @@ export default function App() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [userSearch, setUserSearch] = useState('');
+  const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>([]);
+  const [paymentPackage, setPaymentPackage] = useState(30);
+  const [paymentMsg, setPaymentMsg] = useState('');
   const [practiceMode, setPracticeMode] = useState<'vi' | 'en'>('vi');
   const [practiceGrade, setPracticeGrade] = useState('12');
   const [practiceLevel, setPracticeLevel] = useState('');
@@ -643,7 +664,7 @@ export default function App() {
   const [showInstallHelp, setShowInstallHelp] = useState(false);
 
   const bankParams = useMemo(() => {
-    const p = eqParams({ grade, level: level || undefined, qtype: qtype || undefined });
+    const p = eqParams({ grade, lesson: bankLesson || undefined, level: level || undefined, qtype: qtype || undefined });
     if (chapter.trim()) p.set('chapter', ilike(chapter.trim()));
     if (dang.trim()) p.set('dang', ilike(dang.trim()));
     if (search.trim()) {
@@ -651,7 +672,22 @@ export default function App() {
       p.set('or', `(content.ilike.*${s}*,correct.ilike.*${s}*,explanation.ilike.*${s}*,dang.ilike.*${s}*,chapter.ilike.*${s}*)`);
     }
     return p;
-  }, [grade, chapter, dang, level, qtype, search]);
+  }, [grade, bankLesson, chapter, dang, level, qtype, search]);
+
+  const bankGroups = useMemo(() => {
+    const lessonOf = (q: Question) => (q.lesson ?? '').trim() || lessonTitle(q.chapter) || baseChapter(q.chapter) || 'Chưa phân bài';
+    const lessonRank = (q: Question) => { const idx = (ENGLISH_LESSONS[q.grade] ?? []).indexOf(lessonOf(q)); return idx >= 0 ? idx : 999; };
+    const levelRank = (l: string) => { const idx = LEVELS.indexOf(l as Level); return idx >= 0 ? idx : 99; };
+    const sorted = [...questions].sort((a, b) => lessonRank(a) - lessonRank(b) || lessonOf(a).localeCompare(lessonOf(b), 'vi') || levelRank(a.level) - levelRank(b.level) || a.dang.localeCompare(b.dang, 'vi') || a.id - b.id);
+    const groups: { lesson: string; level: string; dang: string; items: Question[] }[] = [];
+    for (const q of sorted) {
+      const lesson = lessonOf(q);
+      const last = groups[groups.length - 1];
+      if (last && last.lesson === lesson && last.level === q.level && last.dang === q.dang) last.items.push(q);
+      else groups.push({ lesson, level: q.level, dang: q.dang, items: [q] });
+    }
+    return groups;
+  }, [questions]);
 
   const englishLessons = englishGrade === 'all' ? [...ENGLISH_LESSONS[10], ...ENGLISH_LESSONS[11], ...ENGLISH_LESSONS[12]] : ENGLISH_LESSONS[englishGrade];
   const englishParams = useMemo(() => {
@@ -700,6 +736,50 @@ export default function App() {
     if (!session?.user?.id) return;
     await updateProfile(session.user.id, { english_requested: true });
     setMatrixMsg('Đã gửi yêu cầu cấp quyền Toán tiếng Anh tới quản trị.');
+  }
+
+  async function loadPaymentRequests() {
+    if (!session?.user?.id) { setPaymentRequests([]); return; }
+    try {
+      const p = new URLSearchParams({ select: '*', order: 'created_at.desc', limit: '100' });
+      if (!isAdmin) p.set('user_id', `eq.${session.user.id}`);
+      setPaymentRequests(await supabaseGet<PaymentRequest[]>('payment_requests', p, true));
+    } catch (e) { setPaymentMsg(e instanceof Error ? e.message : String(e)); }
+  }
+
+  async function createPaymentRequest() {
+    if (!session?.user?.id) { setPaymentMsg('Bạn đăng nhập trước rồi chọn gói gia hạn nhé.'); return; }
+    const pack = PAYMENT_PACKAGES.find((x) => x.days === paymentPackage) ?? PAYMENT_PACKAGES[1];
+    const note = `TOANTHPT ${pack.days} NGAY ${session.user.email ?? ''}`.trim();
+    try {
+      await supabaseInsert<PaymentRequest[]>('payment_requests', { user_id: session.user.id, email: session.user.email ?? '', package_days: pack.days, amount: pack.amount, status: 'pending', note }, true);
+      setPaymentMsg(`Đã tạo yêu cầu ${pack.label} — ${pack.amount.toLocaleString('vi-VN')}đ. Nội dung chuyển khoản: ${note}. Quản trị xác nhận thanh toán xong sẽ cộng ${pack.days} ngày vào tài khoản.`);
+      await loadPaymentRequests();
+    } catch (e) { setPaymentMsg(e instanceof Error ? e.message : String(e)); }
+  }
+
+  async function approvePaymentRequest(req: PaymentRequest) {
+    if (!isAdmin) return;
+    try {
+      const p = eqParams({ user_id: req.user_id }); p.set('select', '*');
+      const rows = await supabaseGet<Profile[]>('profiles', p, true);
+      const target = rows[0];
+      const currentEnd = target ? new Date(target.trial_ends_at).getTime() : 0;
+      const base = Math.max(Date.now(), Number.isFinite(currentEnd) ? currentEnd : 0);
+      await updateProfile(req.user_id, { trial_ends_at: new Date(base + req.package_days * 86400000).toISOString() });
+      await supabaseUpdate('payment_requests', eqParams({ id: req.id }), { status: 'approved', approved_at: new Date().toISOString() }, true);
+      setPaymentMsg(`Đã duyệt và gia hạn ${req.package_days} ngày cho ${req.email}.`);
+      await loadPaymentRequests();
+    } catch (e) { setPaymentMsg(e instanceof Error ? e.message : String(e)); }
+  }
+
+  async function rejectPaymentRequest(req: PaymentRequest) {
+    if (!isAdmin) return;
+    try {
+      await supabaseUpdate('payment_requests', eqParams({ id: req.id }), { status: 'rejected' }, true);
+      setPaymentMsg(`Đã từ chối yêu cầu gia hạn của ${req.email}.`);
+      await loadPaymentRequests();
+    } catch (e) { setPaymentMsg(e instanceof Error ? e.message : String(e)); }
   }
 
   async function loadVocab(nextPage = vocabPage) {
@@ -923,7 +1003,7 @@ export default function App() {
       setBankTotal(total);
       const p = new URLSearchParams(bankParams);
       p.set('select', '*');
-      p.set('order', 'id.asc');
+      p.set('order', 'lesson.asc,level.asc,dang.asc,id.asc');
       p.set('limit', String(pageSize));
       p.set('offset', String(nextPage * pageSize));
       setQuestions(await supabaseGet<Question[]>('questions', p));
@@ -1109,6 +1189,42 @@ export default function App() {
     return all;
   }
 
+  async function saveExamCodes(codes: GeneratedCode[], assignNow = false, auto = false): Promise<ExamRecord | null> {
+    if (!codes.length) { if (!auto) setError('Hãy sinh mã đề trước.'); return null; }
+    if (!session) { if (!auto) { setError('Hãy đăng nhập giáo viên trước khi lưu đề.'); setTab('assign'); } return null; }
+    if (!canTeach) { if (!auto) setError('Tài khoản giáo viên cần full tính năng để lưu đề.'); return null; }
+    const examRows = await supabaseInsert<ExamRecord[]>('exams', {
+      title: examTitle.trim() || `Đề Toán lớp ${mGrade}`,
+      grade: mGrade,
+      scope_chapter: scopeMode === 'chapter' ? mChapter : scopeMode === 'lesson' ? baseChapter(mLesson) : '',
+      scope_lesson: scopeMode === 'lesson' ? mLesson : '',
+      matrix: { levelNeed, partNeed, partPoints, examLang },
+      codes: codes.map((c) => ({ code: c.code, questionIds: c.questions.map((q) => q.id), questionPoints: c.questions.map((q) => Number(q.points || 0)), rawPoints: c.rawPoints })),
+      duration_minutes: duration,
+    }, true);
+    const exam = examRows[0];
+    if (!exam) return null;
+    if (!assignNow) {
+      await loadTeacherData();
+      return exam;
+    }
+    const code = makeJoinCode();
+    await supabaseInsert('assignments', {
+      exam_id: exam.id,
+      class_id: selectedClassId ? Number(selectedClassId) : null,
+      join_code: code,
+      title: exam.title,
+      duration_minutes: duration,
+      show_result: true,
+      is_open: true,
+    }, true);
+    await loadTeacherData();
+    setJoinCode(code);
+    setMatrixMsg(`Đã giao bài. Mã vào làm bài: ${code}`);
+    setTab('assign');
+    return exam;
+  }
+
   async function generateExam() {
     if (!isSupabaseConfigured) return;
     setLoading(true); setError(''); setMatrixMsg(''); setGenerated([]);
@@ -1164,7 +1280,10 @@ export default function App() {
         codes.push({ code: c, questions: qs, rawPoints: QTYPES.reduce((s, q) => s + (partNeed[q] > 0 ? partPoints[q] : 0), 0) });
       }
       setGenerated(codes);
-      setMatrixMsg(`Đã sinh ${codes.length} mã, mỗi mã ${totalLevel} câu, không trùng câu giữa các mã.`);
+      try { localStorage.setItem('toan-thpt-last-generated-exam', JSON.stringify({ savedAt: new Date().toISOString(), title: examTitle, grade: mGrade, duration, codes })); } catch { /* bỏ qua nếu bộ nhớ trình duyệt đầy */ }
+      let saved: ExamRecord | null = null;
+      try { saved = await saveExamCodes(codes, false, true); } catch (e) { saved = null; setError(e instanceof Error ? e.message : String(e)); }
+      setMatrixMsg(saved ? `Đã sinh ${codes.length} mã, mỗi mã ${totalLevel} câu, không trùng câu giữa các mã. Đã tự động lưu đề “${saved.title}” vào mục Đề đã lưu.` : `Đã sinh ${codes.length} mã, mỗi mã ${totalLevel} câu, không trùng câu giữa các mã. Đề đã giữ tạm trên máy này; đăng nhập giáo viên full tính năng để tự động lưu vào Đề đã lưu.`);
       setTab('print');
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -1236,39 +1355,10 @@ export default function App() {
   }
 
   async function saveGeneratedAsAssignment(assignNow = true) {
-    if (!session) { setError('Hãy đăng nhập giáo viên trước khi lưu đề.'); setTab('assign'); return; }
-    if (!generated.length) { setError('Hãy sinh mã đề trước.'); return; }
     setLoading(true); setError('');
     try {
-      const examRows = await supabaseInsert<ExamRecord[]>('exams', {
-        title: examTitle.trim() || `Đề Toán lớp ${mGrade}`,
-        grade: mGrade,
-        scope_chapter: scopeMode === 'chapter' ? mChapter : scopeMode === 'lesson' ? baseChapter(mLesson) : '',
-        scope_lesson: scopeMode === 'lesson' ? mLesson : '',
-        matrix: { levelNeed, partNeed, partPoints },
-        codes: generated.map((c) => ({ code: c.code, questionIds: c.questions.map((q) => q.id), questionPoints: c.questions.map((q) => Number(q.points || 0)), rawPoints: c.rawPoints })),
-        duration_minutes: duration,
-      }, true);
-      const exam = examRows[0];
-      if (!assignNow) {
-        await loadTeacherData();
-        setMatrixMsg(`Đã lưu đề “${exam.title}” vào mục Đề đã lưu.`);
-        return;
-      }
-      const code = makeJoinCode();
-      await supabaseInsert('assignments', {
-        exam_id: exam.id,
-        class_id: selectedClassId ? Number(selectedClassId) : null,
-        join_code: code,
-        title: exam.title,
-        duration_minutes: duration,
-        show_result: true,
-        is_open: true,
-      }, true);
-      await loadTeacherData();
-      setJoinCode(code);
-      setMatrixMsg(`Đã giao bài. Mã vào làm bài: ${code}`);
-      setTab('assign');
+      const exam = await saveExamCodes(generated, assignNow, false);
+      if (exam && !assignNow) setMatrixMsg(`Đã lưu đề “${exam.title}” vào mục Đề đã lưu.`);
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setLoading(false); }
   }
 
@@ -1569,7 +1659,8 @@ export default function App() {
   useEffect(() => { const h = new URLSearchParams(window.location.hash.replace(/^#/, '')); if (h.get('type') === 'recovery' && h.get('access_token')) { setRecoveryToken(h.get('access_token') ?? ''); setMatrixMsg('Nhập mật khẩu mới rồi bấm Đặt mật khẩu mới nhé.'); } }, []);
   useEffect(() => { if (session) { void loadProfile(); } else setProfile(null); }, [session]);
   useEffect(() => { if (session && canTeach) void loadTeacherData(); }, [session, canTeach]);
-  useEffect(() => { if ((tab === 'admin' || tab === 'users') && isAdmin) void loadProfiles(); }, [tab, isAdmin]);
+  useEffect(() => { if ((tab === 'admin' || tab === 'users' || tab === 'payment') && isAdmin) void loadProfiles(); }, [tab, isAdmin]);
+  useEffect(() => { if (tab === 'payment') void loadPaymentRequests(); }, [tab, session, isAdmin]);
   useEffect(() => { if (tab === 'results' && session) void loadSubmissions(); }, [tab, session]);
   useEffect(() => { if (tab === 'matrix') void loadScopes(); }, [tab, mGrade]);
   useEffect(() => {
@@ -1642,7 +1733,7 @@ export default function App() {
           <button className="install-btn" onClick={() => void installApp()}>📲 Cài ứng dụng</button>
         </div>
         <nav>
-          {([['overview', 'Tổng quan'], ['bank', 'Ngân hàng câu hỏi'], ['theory', 'Lý thuyết'], ['english', 'Toán tiếng Anh'], ['matrix', 'Tạo đề'], ['print', 'In đề'], ['assign', 'Giao bài'], ['take', 'Học sinh làm bài'], ['results', 'Kết quả'], ['practice', 'Tự luyện'], ['games', 'Trò chơi'], ['news', 'Tin giáo dục'], ['admin', 'Quản trị'], ...(isAdmin ? [['users', 'Quản lý người dùng'] as [Tab, string]] : [])] as [Tab, string][]).map(([t, label]) => (
+          {([['overview', 'Tổng quan'], ['bank', 'Ngân hàng câu hỏi'], ['theory', 'Lý thuyết'], ['english', 'Toán tiếng Anh'], ['matrix', 'Tạo đề'], ['print', 'In đề'], ['assign', 'Giao bài'], ['take', 'Học sinh làm bài'], ['results', 'Kết quả'], ['practice', 'Tự luyện'], ['games', 'Trò chơi'], ['news', 'Tin giáo dục'], ['payment', 'Thanh toán'], ['admin', 'Quản trị'], ...(isAdmin ? [['users', 'Quản lý người dùng'] as [Tab, string]] : [])] as [Tab, string][]).map(([t, label]) => (
             <button key={t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)}>{label}</button>
           ))}
         </nav>
@@ -1688,7 +1779,8 @@ export default function App() {
       {tab === 'bank' && (
         <main>
           <section className="filters no-print">
-            <label>Lớp<select value={grade} onChange={(e) => { setGrade(Number(e.target.value)); setPage(0); }}><option>10</option><option>11</option><option>12</option></select></label>
+            <label>Lớp<select value={grade} onChange={(e) => { setGrade(Number(e.target.value)); setBankLesson(''); setPage(0); }}><option>10</option><option>11</option><option>12</option></select></label>
+            <label>Bài<select value={bankLesson} onChange={(e) => { setBankLesson(e.target.value); setPage(0); }}><option value="">Tất cả bài</option>{ENGLISH_LESSONS[grade].map((l) => <option key={l} value={l}>{l}</option>)}</select></label>
             <label>Chương<input value={chapter} onChange={(e) => setChapter(e.target.value)} placeholder="Tên chương" /></label>
             <label>Dạng<input value={dang} onChange={(e) => setDang(e.target.value)} placeholder="Dạng toán" /></label>
             <label>Mức<select value={level} onChange={(e) => setLevel(e.target.value)}><option value="">Tất cả</option>{LEVELS.map((l) => <option key={l}>{l}</option>)}</select></label>
@@ -1697,8 +1789,14 @@ export default function App() {
             <button onClick={() => { setPage(0); void loadBank(0); }}>Lọc</button>
             <label className="check"><input type="checkbox" checked={showAnswers} onChange={(e) => setShowAnswers(e.target.checked)} /> Hiện đáp án/lời giải</label>
           </section>
-          <p className="muted">Có {bankTotal} câu khớp bộ lọc. Trang {page + 1}.</p>
-          {questions.map((q) => <QuestionCard key={q.id} q={q} showAnswers={showAnswers} />)}
+          <p className="muted">Có {bankTotal} câu khớp bộ lọc. Trang {page + 1}. Đang xếp lần lượt: Bài → Mức → Dạng.</p>
+          {bankGroups.map((g) => (
+            <section className="bank-group" key={`${g.lesson}-${g.level}-${g.dang}`}>
+              <h3>Bài: {g.lesson}</h3>
+              <p className="meta">Mức {g.level} · Dạng: {g.dang} · {g.items.length} câu ở trang này</p>
+              {g.items.map((q) => <QuestionCard key={q.id} q={q} showAnswers={showAnswers} />)}
+            </section>
+          ))}
           <div className="pager no-print">
             <button disabled={page <= 0} onClick={() => { const p = page - 1; setPage(p); void loadBank(p); }}>Trang trước</button>
             <button disabled={(page + 1) * pageSize >= bankTotal} onClick={() => { const p = page + 1; setPage(p); void loadBank(p); }}>Trang sau</button>
@@ -1855,6 +1953,22 @@ export default function App() {
             <button onClick={() => exportLatex('dapan')} disabled={!generated.length}>Xuất đáp án LaTeX</button>
           </div>
           {matrixMsg && <p className="notice">{matrixMsg}</p>}
+          {generated.length > 0 && (
+            <section className="card answer-key">
+              <h3>Đáp án ở cuối đề</h3>
+              <p className="muted">Kiểm tra nhanh đáp án ngay sau khi sinh đề để không bị sót trước khi lưu/giao bài. File đề cho học sinh vẫn tách riêng; file đáp án xuất riêng kèm lời giải.</p>
+              {generated.map((code) => (
+                <article className="question" key={code.code}>
+                  <p><strong>Mã đề {String(code.code).padStart(2, '0')}</strong></p>
+                  {QTYPES.map((qt) => {
+                    const qs = code.questions.filter((q) => q.qtype === qt);
+                    if (!qs.length) return null;
+                    return <p key={qt}><strong>{QTYPE_LABEL[qt]}:</strong> {qs.map((q, i) => <span key={q.id}>Câu {i + 1}: <MathText text={q.correct} />{i < qs.length - 1 ? ' · ' : ''}</span>)}</p>;
+                  })}
+                </article>
+              ))}
+            </section>
+          )}
           <section className="card">
             <h3>Đề đã lưu</h3>
             {!session && <p className="muted">Đăng nhập giáo viên để lưu và xem các đề đã tạo.</p>}
@@ -1906,6 +2020,15 @@ export default function App() {
                   </div>
                 );
               })}
+              <div className="answer answer-key no-print">
+                <h3>Đáp án ở cuối đề — Mã đề {String(code.code).padStart(2, '0')}</h3>
+                <p className="muted">Phần này hiện trên màn hình để kiểm tra trước khi lưu/in; khi in đề cho học sinh sẽ không in kèm đáp án.</p>
+                {QTYPES.map((qt) => {
+                  const qs = code.questions.filter((q) => q.qtype === qt);
+                  if (!qs.length) return null;
+                  return <p key={qt}><strong>{QTYPE_LABEL[qt]}:</strong> {qs.map((q, i) => <span key={q.id}>Câu {i + 1}: <MathText text={q.correct} />{i < qs.length - 1 ? ' · ' : ''}</span>)}</p>;
+                })}
+              </div>
             </section>
           ))}
         </main>
@@ -2086,6 +2209,40 @@ export default function App() {
               <p><a href={n.url} target="_blank" rel="noreferrer">Mở nguồn chính thức</a></p>
             </section>
           ))}
+        </main>
+      )}
+
+      {tab === 'payment' && (
+        <main>
+          <section className="card">
+            <h2>Thanh toán / Gia hạn gói</h2>
+            <p className="muted">Tài khoản mới được dùng thử 3 ngày full tính năng. Hết hạn, bạn chọn gói gia hạn để tiếp tục dùng full tính năng.</p>
+            {session ? <p><strong>{session.user?.email}</strong> · {isAdmin ? 'Quản trị toàn quyền' : profile?.full_access ? 'Đã được cấp full tính năng' : inTrial ? `Đang dùng full tính năng đến ${new Date(profile!.trial_ends_at).toLocaleDateString('vi-VN')}` : 'Tài khoản đang giới hạn'}</p> : <p className="notice">Bạn đăng nhập hoặc tạo tài khoản trước, sau đó chọn gói gia hạn tại đây.</p>}
+            <div className="grid">
+              {PAYMENT_PACKAGES.map((pack) => (
+                <article className={`card package-card ${paymentPackage === pack.days ? 'selected' : ''}`} key={pack.days}>
+                  <h3>{pack.label}</h3>
+                  <p className="big">{pack.amount.toLocaleString('vi-VN')}đ</p>
+                  <p className="muted">{pack.desc}</p>
+                  <button className={paymentPackage === pack.days ? 'primary' : ''} onClick={() => setPaymentPackage(pack.days)}>{paymentPackage === pack.days ? 'Đang chọn' : 'Chọn gói này'}</button>
+                </article>
+              ))}
+            </div>
+            {session && <div className="filters"><button className="primary" onClick={() => void createPaymentRequest()}>Đăng ký gia hạn {paymentPackage} ngày</button><span className="muted">Nội dung chuyển khoản: TOANTHPT {paymentPackage} NGAY {session.user?.email}</span></div>}
+            {paymentMsg && <p className="notice">{paymentMsg}</p>}
+          </section>
+          <section className="card">
+            <h3>{isAdmin ? 'Yêu cầu thanh toán/gia hạn' : 'Lịch sử yêu cầu của bạn'}</h3>
+            {!session && <p className="muted">Đăng nhập để xem lịch sử yêu cầu gia hạn.</p>}
+            {session && paymentRequests.length === 0 && <p className="muted">Chưa có yêu cầu gia hạn nào.</p>}
+            {paymentRequests.map((req) => (
+              <article className="question" key={req.id}>
+                <p><strong>{req.email}</strong> · Gói {req.package_days} ngày · {req.amount.toLocaleString('vi-VN')}đ · {req.status === 'pending' ? 'Chờ xác nhận' : req.status === 'approved' ? 'Đã gia hạn' : req.status === 'paid' ? 'Đã thanh toán' : 'Đã từ chối'}</p>
+                <p className="meta">{new Date(req.created_at).toLocaleString('vi-VN')} · Nội dung: {req.note}</p>
+                {isAdmin && req.status === 'pending' && <div className="filters"><button className="primary" onClick={() => void approvePaymentRequest(req)}>Duyệt & gia hạn</button><button onClick={() => void rejectPaymentRequest(req)}>Từ chối</button></div>}
+              </article>
+            ))}
+          </section>
         </main>
       )}
 

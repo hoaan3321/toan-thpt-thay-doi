@@ -131,3 +131,10 @@ button.primary, button.active { background: #2563eb; border-color: #2563eb; }
 .dash3d { position: absolute; left: 49%; width: 2%; top: 44%; bottom: 0; background: repeating-linear-gradient(to bottom, #f8fafc 0 16px, transparent 16px 34px); animation: dash-move 0.35s linear infinite; clip-path: polygon(30% 0, 70% 0, 100% 100%, 0 100%); }
 .car3d { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); font-size: 68px; filter: drop-shadow(0 10px 6px rgba(0,0,0,.45)); animation: car-bob 0.3s ease-in-out infinite; }
 .opp3d { position: absolute; filter: drop-shadow(0 4px 3px rgba(0,0,0,.4)); transition: all .7s ease; }
+
+.bank-group { margin: 18px 0; }
+.bank-group > h3 { margin: 18px 0 4px; color: #1d4ed8; }
+.answer-key { border-color: #86efac; }
+.answer-key h3 { color: #166534; }
+.package-card.selected { border-color: #2563eb; box-shadow: 0 14px 34px rgba(37,99,235,.18); }
+.package-card .big { font-size: 34px; }
