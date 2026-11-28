@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import MathText from './MathText';
 import { eqParams, getSession, ilike, isSupabaseConfigured, signIn, signOut, signUp, recoverPassword, resendConfirmation, updatePassword, supabaseCount, supabaseDelete, supabaseGet, supabaseInsert, supabaseRpc, supabaseUpdate, type AuthSession } from './supabase';
 import { LEVELS, QTYPES, QTYPE_LABEL, type Assignment, type ClassRecord, type ExamRecord, type Level, type QType, type Question, type StudentRecord, type Submission, type TheoryNote } from './types';
 
-type Tab = 'overview' | 'bank' | 'theory' | 'english' | 'matrix' | 'print' | 'assign' | 'take' | 'results' | 'admin' | 'users' | 'practice' | 'news' | 'games' | 'payment';
+type Tab = 'overview' | 'bank' | 'theory' | 'english' | 'matrix' | 'created' | 'print' | 'assign' | 'take' | 'results' | 'admin' | 'users' | 'practice' | 'news' | 'games' | 'payment';
 
 const TAB_META: Record<Tab, { eyebrow: string; title: string; desc: string }> = {
   overview: { eyebrow: 'Trang chủ', title: 'Toán Thầy Đôi - Love Math', desc: 'Nền tảng dạy và học Toán THPT.' },
@@ -11,6 +11,7 @@ const TAB_META: Record<Tab, { eyebrow: string; title: string; desc: string }> = 
   theory: { eyebrow: 'Học liệu', title: 'Lý thuyết trọng tâm', desc: 'Tóm tắt kiến thức theo chương, trình bày ngắn gọn để dạy và ôn tập.' },
   english: { eyebrow: 'Toán tiếng Anh', title: 'English Math THPT', desc: 'Bài tập, lời giải song ngữ và từ vựng bắt buộc theo từng bài.' },
   matrix: { eyebrow: 'Tạo đề', title: 'Tạo đề theo ma trận', desc: 'Sinh nhiều mã đề tương đương, xem ma trận và bảng đặc tả trước khi xuất file.' },
+  created: { eyebrow: 'Đề đã tạo', title: 'Đề đã tạo', desc: 'Mở lại từng đề đã lưu kèm ma trận đề, bảng đặc tả và đáp án của từng mã.' },
   print: { eyebrow: 'Xuất bản', title: 'In đề / đáp án', desc: 'Xem bản in chuẩn A4 và xuất DOCX, PDF, LaTeX cho đề và đáp án.' },
   assign: { eyebrow: 'Lớp học', title: 'Lớp học & giao bài', desc: 'Tạo lớp, nhập học sinh và giao bài bằng mã vào làm bài.' },
   take: { eyebrow: 'Làm bài trực tuyến', title: 'Học sinh làm bài', desc: 'Nhập mã giao bài để làm bài có bấm giờ và nộp trực tuyến.' },
@@ -718,6 +719,9 @@ export default function App() {
   const [students, setStudents] = useState<StudentRecord[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [exams, setExams] = useState<ExamRecord[]>([]);
+  const [createdExam, setCreatedExam] = useState<ExamRecord | null>(null);
+  const [createdCodes, setCreatedCodes] = useState<GeneratedCode[]>([]);
+  const [createdCodeIdx, setCreatedCodeIdx] = useState(0);
   const [className, setClassName] = useState('');
   const [classGrade, setClassGrade] = useState(12);
   const [studentNames, setStudentNames] = useState('');
@@ -1532,12 +1536,42 @@ export default function App() {
 
   async function loadQuestionsByIds(ids: number[]): Promise<Question[]> {
     if (!ids.length) return [];
-    const p = new URLSearchParams();
-    p.set('select', '*');
-    p.set('id', `in.(${ids.join(',')})`);
-    const rows = await supabaseGet<Question[]>('questions', p);
-    const byId = new Map(rows.map((q) => [q.id, q]));
+    const viIds = ids.filter((id) => id < 900000000);
+    const enIds = ids.filter((id) => id >= 900000000).map((id) => id - 900000000);
+    const byId = new Map<number, Question>();
+    if (viIds.length) {
+      const p = new URLSearchParams();
+      p.set('select', '*');
+      p.set('id', `in.(${viIds.join(',')})`);
+      const rows = await supabaseGet<Question[]>('questions', p);
+      for (const q of rows) byId.set(q.id, q);
+    }
+    if (enIds.length) {
+      const p = new URLSearchParams();
+      p.set('select', '*');
+      p.set('id', `in.(${enIds.join(',')})`);
+      const rows = await supabaseGet<Question[]>('english_questions', p, true).catch(() => [] as Question[]);
+      for (const q of rows) byId.set(q.id + 900000000, { ...q, id: q.id + 900000000 });
+    }
     return ids.map((id) => byId.get(id)).filter(Boolean) as Question[];
+  }
+
+  async function openCreatedExam(exam: ExamRecord) {
+    setLoading(true); setError('');
+    try {
+      const loaded: GeneratedCode[] = [];
+      for (const c of exam.codes ?? []) {
+        const qs = await loadQuestionsByIds(c.questionIds ?? []);
+        loaded.push({ code: c.code, questions: qs.map((q, i) => ({ ...q, points: Number(c.questionPoints?.[i] ?? q.points ?? 0) })), rawPoints: Number(c.rawPoints ?? 10) });
+      }
+      setCreatedExam(exam);
+      setCreatedCodes(loaded);
+      setCreatedCodeIdx(0);
+      setGenerated(loaded);
+      setMGrade(exam.grade);
+      setExamTitle(exam.title);
+      setDuration(exam.duration_minutes ?? 45);
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setLoading(false); }
   }
 
   async function startTake() {
@@ -1969,7 +2003,7 @@ export default function App() {
       </header>
         {(
           <nav className={`app-nav mobile-menu ${showMobileMenu ? 'open' : ''}`} aria-label="Menu chức năng">
-            <section><h3>Đề thi & câu hỏi</h3><button className={tab === 'matrix' ? 'active' : 'hot'} onClick={() => goTab('matrix')}>Tạo đề theo ma trận</button><button className={tab === 'bank' ? 'active' : ''} onClick={() => goTab('bank')}>Ngân hàng câu hỏi</button><button className={tab === 'print' ? 'active' : ''} onClick={() => goTab('print')}>In đề / đáp án</button><button className={tab === 'admin' ? 'active' : ''} onClick={() => goTab('admin')}>Quản trị câu hỏi</button></section>
+            <section><h3>Đề thi & câu hỏi</h3><button className={tab === 'matrix' ? 'active' : 'hot'} onClick={() => goTab('matrix')}>Tạo đề theo ma trận</button><button className={tab === 'created' ? 'active' : ''} onClick={() => goTab('created')}>Đề đã tạo</button><button className={tab === 'bank' ? 'active' : ''} onClick={() => goTab('bank')}>Ngân hàng câu hỏi</button><button className={tab === 'print' ? 'active' : ''} onClick={() => goTab('print')}>In đề / đáp án</button><button className={tab === 'admin' ? 'active' : ''} onClick={() => goTab('admin')}>Quản trị câu hỏi</button></section>
             <section><h3>Lớp học & kết quả</h3><button className={tab === 'assign' ? 'active' : ''} onClick={() => goTab('assign')}>Lớp học & giao bài</button><button className={tab === 'take' ? 'active' : ''} onClick={() => goTab('take')}>Học sinh làm bài</button><button className={tab === 'results' ? 'active' : ''} onClick={() => goTab('results')}>Kết quả / Thống kê</button><button className={tab === 'payment' ? 'active' : ''} onClick={() => goTab('payment')}>Thanh toán / gia hạn</button>{isAdmin && <button className={tab === 'users' ? 'active' : ''} onClick={() => goTab('users')}>Quản lý người dùng</button>}</section>
             <section><h3>Dạy học & học liệu</h3><button className={tab === 'theory' ? 'active' : ''} onClick={() => goTab('theory')}>Lý thuyết</button><button className={tab === 'english' ? 'active' : ''} onClick={() => goTab('english')}>Toán tiếng Anh</button><button className={tab === 'practice' ? 'active' : ''} onClick={() => goTab('practice')}>Tự luyện</button><button className={tab === 'news' ? 'active' : ''} onClick={() => goTab('news')}>Tin giáo dục</button></section>
             <section><h3>Trò chơi ôn tập</h3><button className={tab === 'games' ? 'active' : ''} onClick={() => goTab('games')}>Trò chơi 3D</button></section>
@@ -2347,6 +2381,98 @@ export default function App() {
               </article>
             ))}
           </section>
+        </main>
+      )}
+
+      {tab === 'created' && (
+        <main>
+          <section className="card">
+            <h3>Danh sách đề đã tạo</h3>
+            {!session && <p className="muted">Đăng nhập giáo viên để xem các đề đã tạo và đã lưu.</p>}
+            {session && exams.length === 0 && <p className="muted">Chưa có đề nào. Vào mục Tạo đề theo ma trận để sinh mã đề, đề sẽ tự lưu vào đây.</p>}
+            {session && exams.map((ex) => (
+              <article className="question" key={ex.id}>
+                <p><strong>{ex.title}</strong> · Lớp {ex.grade} · {(ex.codes ?? []).length} mã đề · {ex.duration_minutes ?? 45} phút</p>
+                <p className="meta">{ex.scope_lesson || ex.scope_chapter || 'Toàn khối'}{ex.created_at ? ` · ${new Date(ex.created_at).toLocaleString('vi-VN')}` : ''}</p>
+                <div className="filters">
+                  <button className="primary" onClick={() => void openCreatedExam(ex)}>Xem ma trận & đáp án</button>
+                  <button onClick={() => void openSavedExam(ex)}>In đề</button>
+                  <button onClick={() => void assignSavedExam(ex)}>Giao bài</button>
+                  <button onClick={() => void deleteSavedExam(ex)}>Xóa</button>
+                </div>
+              </article>
+            ))}
+          </section>
+          {createdExam && createdCodes.length > 0 && (() => {
+            const code = createdCodes[Math.min(createdCodeIdx, createdCodes.length - 1)];
+            const bhvOf = (l: Level) => (l === 'NB' ? 'Biết' : l === 'TH' ? 'Hiểu' : 'VD');
+            const partLabel: Record<QType, string> = { single: 'TN nhiều lựa chọn', tf: 'TN đúng - sai', short: 'TN trả lời ngắn', essay: 'Tự luận' };
+            const partCode: Record<QType, string> = { single: 'TNNLC', tf: 'TNĐS', short: 'TLN', essay: 'TL' };
+            const rowsMap = new Map<string, { chapter: string; lesson: string; qs: Question[] }>();
+            for (const q of code.questions) {
+              const lesson = (q.lesson ?? '').trim() || lessonTitle(q.chapter) || q.chapter;
+              const key = lessonKey(`${baseChapter(q.chapter)} — ${lesson}`);
+              if (!rowsMap.has(key)) rowsMap.set(key, { chapter: baseChapter(q.chapter), lesson, qs: [] });
+              rowsMap.get(key)!.qs.push(q);
+            }
+            const order = ENGLISH_LESSONS[createdExam.grade] ?? [];
+            const rows = [...rowsMap.values()].sort((a, b) => {
+              const ia = order.indexOf(a.lesson); const ib = order.indexOf(b.lesson);
+              if (ia >= 0 && ib >= 0) return ia - ib;
+              if (ia >= 0) return -1;
+              if (ib >= 0) return 1;
+              return a.lesson.localeCompare(b.lesson, 'vi');
+            });
+            const totalPts = code.questions.reduce((a, q) => a + Number(q.points || 0), 0);
+            const cnt = (qs: Question[], part: QType, g: string) => qs.filter((q) => q.qtype === part && bhvOf(q.level) === g).length;
+            const pts = (qs: Question[]) => qs.reduce((a, q) => a + Number(q.points || 0), 0);
+            return (
+              <>
+                <section className="card">
+                  <h3>{createdExam.title} — Lớp {createdExam.grade}</h3>
+                  <div className="filters">
+                    {createdCodes.map((c, i) => <button key={c.code} className={i === createdCodeIdx ? 'primary' : ''} onClick={() => setCreatedCodeIdx(i)}>Mã đề {String(c.code).padStart(2, '0')}</button>)}
+                    <button onClick={() => setTab('print')}>In đề / Xuất file</button>
+                  </div>
+                  <h4>Ma trận đề (Mã {String(code.code).padStart(2, '0')})</h4>
+                  <div className="tablewrap"><table className="matrix-table">
+                    <thead><tr><th>TT</th><th>Chương/chủ đề</th><th>Nội dung/đơn vị kiến thức</th>{QTYPES.map((p) => <th key={p} colSpan={3}>{partLabel[p]}</th>)}<th>Tổng điểm</th><th>Tỉ lệ %</th></tr>
+                    <tr><th colSpan={3}></th>{QTYPES.map((p) => <Fragment key={p}><th>Biết</th><th>Hiểu</th><th>VD</th></Fragment>)}<th></th><th></th></tr></thead>
+                    <tbody>
+                      {rows.map((r, i) => (
+                        <tr key={r.lesson}><td>{i + 1}</td><td>{r.chapter}</td><td>{r.lesson}</td>
+                          {QTYPES.map((p) => <Fragment key={p}><td>{cnt(r.qs, p, 'Biết') || ''}</td><td>{cnt(r.qs, p, 'Hiểu') || ''}</td><td>{cnt(r.qs, p, 'VD') || ''}</td></Fragment>)}
+                          <td>{fmtPoints(pts(r.qs))}</td><td>{totalPts > 0 ? `${((pts(r.qs) / totalPts) * 100).toFixed(1).replace('.', ',')}%` : ''}</td></tr>
+                      ))}
+                      <tr><td colSpan={3}><strong>Tổng số câu</strong></td>{QTYPES.map((p) => <Fragment key={p}><td>{cnt(code.questions, p, 'Biết') || ''}</td><td>{cnt(code.questions, p, 'Hiểu') || ''}</td><td>{cnt(code.questions, p, 'VD') || ''}</td></Fragment>)}<td><strong>{fmtPoints(totalPts)}</strong></td><td><strong>100%</strong></td></tr>
+                    </tbody>
+                  </table></div>
+                  <h4>Bảng đặc tả</h4>
+                  <div className="tablewrap"><table className="matrix-table">
+                    <thead><tr><th>STT</th><th>Chương/chủ đề</th><th>Nội dung/đơn vị kiến thức</th><th>Mức độ kiểm tra, đánh giá</th><th>Số câu hỏi theo mức độ nhận thức</th></tr></thead>
+                    <tbody>
+                      {rows.map((r, i) => (
+                        <tr key={r.lesson}><td>{i + 1}</td><td>{r.chapter}</td><td>{r.lesson}</td>
+                          <td>{[...new Set(r.qs.map((q) => `${q.dang} (${bhvOf(q.level)})`))].join('; ')}</td>
+                          <td>{QTYPES.flatMap((p) => ['Biết', 'Hiểu', 'VD'].map((g) => { const n = cnt(r.qs, p, g); return n ? `${n}${partCode[p]}-${g}` : ''; })).filter(Boolean).join(', ')}</td></tr>
+                      ))}
+                    </tbody>
+                  </table></div>
+                </section>
+                <section className="card">
+                  <h3>Đáp án & lời giải — Mã đề {String(code.code).padStart(2, '0')}</h3>
+                  <div className="tablewrap"><table className="matrix-table">
+                    <thead><tr><th>Câu</th><th>Phần</th><th>Mức</th><th>Đáp án</th><th>Lời giải</th></tr></thead>
+                    <tbody>
+                      {code.questions.map((q, i) => (
+                        <tr key={q.id}><td>{i + 1}</td><td>{partLabel[q.qtype]}</td><td>{q.level}</td><td><MathText text={q.correct || '—'} /></td><td><MathText text={q.explanation || '—'} /></td></tr>
+                      ))}
+                    </tbody>
+                  </table></div>
+                </section>
+              </>
+            );
+          })()}
         </main>
       )}
 
