@@ -64,7 +64,20 @@ function headers(extra: Record<string, string> = {}, useAuth = false): HeadersIn
 
 async function parseError(res: Response): Promise<string> {
   const text = await res.text();
+  if (text.includes('57014') || text.includes('statement timeout')) return 'Dữ liệu đang tải chậm, thầy bấm lại giúp em nhé.';
+  if (res.status >= 500) return 'Máy chủ dữ liệu đang bận, thầy thử lại sau ít giây nhé.';
   return `Supabase ${res.status}: ${text}`;
+}
+
+const TRANSIENT_STATUS = new Set([500, 502, 503, 504]);
+
+async function fetchTransientRetry(input: string, init: RequestInit, useAuth: boolean): Promise<Response> {
+  let res = await authedFetch(input, init, useAuth);
+  for (let attempt = 0; attempt < 3 && TRANSIENT_STATUS.has(res.status); attempt++) {
+    await new Promise((resolve) => setTimeout(resolve, 700 * (attempt + 1)));
+    res = await authedFetch(input, init, useAuth);
+  }
+  return res;
 }
 
 async function fetchWithRetry(input: string, init: RequestInit): Promise<Response> {
@@ -93,7 +106,7 @@ export async function supabaseGet<T>(path: string, params: URLSearchParams, useA
   if (!isSupabaseConfigured) throw new Error('Chưa cấu hình Supabase');
   let res: Response;
   try {
-    res = await authedFetch(`${url}/rest/v1/${path}?${params.toString()}`, { headers: headers({}, useAuth) }, useAuth);
+    res = await fetchTransientRetry(`${url}/rest/v1/${path}?${params.toString()}`, { headers: headers({}, useAuth) }, useAuth);
   } catch {
     throw new Error('Mạng đang chập chờn, thầy bấm lại giúp em nhé.');
   }
@@ -101,11 +114,23 @@ export async function supabaseGet<T>(path: string, params: URLSearchParams, useA
   return (await res.json()) as T;
 }
 
+export async function supabaseRpc<T>(fn: string, args: Record<string, unknown>, useAuth = false): Promise<T> {
+  if (!isSupabaseConfigured) throw new Error('Chưa cấu hình Supabase');
+  let res: Response;
+  try {
+    res = await fetchTransientRetry(`${url}/rest/v1/rpc/${fn}`, { method: 'POST', headers: headers({ 'Content-Type': 'application/json' }, useAuth), body: JSON.stringify(args) }, useAuth);
+  } catch {
+    throw new Error('Mạng đang chập chờn, thầy bấm lại giúp em nhé.');
+  }
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as T;
+}
+
 export async function supabaseCount(path: string, params: URLSearchParams, useAuth = false): Promise<number> {
   if (!isSupabaseConfigured) throw new Error('Chưa cấu hình Supabase');
   const p = new URLSearchParams(params);
   p.set('select', 'id');
-  const res = await authedFetch(`${url}/rest/v1/${path}?${p.toString()}`, {
+  const res = await fetchTransientRetry(`${url}/rest/v1/${path}?${p.toString()}`, {
     headers: headers({ Prefer: 'count=exact', Range: '0-0' }, useAuth),
   }, useAuth);
   if (!res.ok) throw new Error(await parseError(res));

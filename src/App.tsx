@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import MathText from './MathText';
-import { eqParams, getSession, ilike, isSupabaseConfigured, signIn, signOut, signUp, recoverPassword, resendConfirmation, updatePassword, supabaseCount, supabaseDelete, supabaseGet, supabaseInsert, supabaseUpdate, type AuthSession } from './supabase';
+import { eqParams, getSession, ilike, isSupabaseConfigured, signIn, signOut, signUp, recoverPassword, resendConfirmation, updatePassword, supabaseCount, supabaseDelete, supabaseGet, supabaseInsert, supabaseRpc, supabaseUpdate, type AuthSession } from './supabase';
 import { LEVELS, QTYPES, QTYPE_LABEL, type Assignment, type ClassRecord, type ExamRecord, type Level, type QType, type Question, type StudentRecord, type Submission, type TheoryNote } from './types';
 
 type Tab = 'overview' | 'bank' | 'theory' | 'english' | 'matrix' | 'print' | 'assign' | 'take' | 'results' | 'admin' | 'users' | 'practice' | 'news' | 'games' | 'payment';
@@ -739,6 +739,8 @@ export default function App() {
   const [aiInput, setAiInput] = useState('');
   const [aiBusy, setAiBusy] = useState(false);
   const [aiStatus, setAiStatus] = useState('Đang kiểm tra AI…');
+  const [aiModels, setAiModels] = useState<{ id: string; label: string; provider: string }[]>([]);
+  const [aiModel, setAiModel] = useState(() => { try { return localStorage.getItem('toan-thpt-ai-model') || 'auto'; } catch { return 'auto'; } });
   const [aiMessages, setAiMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([{ role: 'assistant', content: 'Thầy hỏi em về bài toán, cách tạo đề hoặc gửi ảnh bài tập để em giải nhé.' }]);
   const [aiImage, setAiImage] = useState<{ mimeType: string; data: string; preview: string } | null>(null);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
@@ -1232,39 +1234,33 @@ export default function App() {
   async function loadScopes(gradeValue = mGrade) {
     if (!isSupabaseConfigured) return;
     try {
-      const counts = new Map<string, number>();
-      const scopeRows: { chapter: string; lesson?: string; dang: string }[] = [];
-      const limit = 1000;
-      for (let offset = 0; ; offset += limit) {
-        const p = eqParams({ grade: gradeValue });
-        p.set('select', 'chapter,lesson,dang');
-        p.set('order', 'id.asc');
-        p.set('limit', String(limit));
-        p.set('offset', String(offset));
-        const rows = await supabaseGet<{ chapter: string; lesson?: string; dang: string }[]>('questions', p);
-        scopeRows.push(...rows);
-        for (const r of rows) counts.set(r.chapter, (counts.get(r.chapter) ?? 0) + 1);
-        if (rows.length < limit) break;
-      }
       const chapterMap = new Map<string, number>();
       const lessonMap = new Map<string, { name: string; base: string; count: number }>();
-      for (const [name, count] of counts.entries()) {
-        const base = baseChapter(name);
-        chapterMap.set(base, (chapterMap.get(base) ?? 0) + count);
-        if (name.includes(' — ')) {
-          const key = lessonKey(name);
-          const display = `${base} — ${lessonTitle(name)}`;
-          if (!lessonMap.has(key)) lessonMap.set(key, { name: display, base, count: 0 });
-        }
-      }
-      for (const r of scopeRows) {
-        const base = baseChapter(r.chapter);
-        const lessonName = (r.lesson ?? '').trim() || lessonTitle(r.chapter);
-        if (!lessonName) continue;
+      const addScope = (chapter: string, lesson: string, n: number) => {
+        const base = baseChapter(chapter);
+        chapterMap.set(base, (chapterMap.get(base) ?? 0) + n);
+        const lessonName = (lesson ?? '').trim() || lessonTitle(chapter);
+        if (!lessonName) return;
         const display = `${base} — ${lessonName}`;
         const key = lessonKey(display);
         if (!lessonMap.has(key)) lessonMap.set(key, { name: display, base, count: 0 });
-        lessonMap.get(key)!.count += 1;
+        lessonMap.get(key)!.count += n;
+      };
+      try {
+        const grouped = await supabaseRpc<{ chapter: string; lesson: string; n: number }[]>('scope_counts', { p_grade: gradeValue });
+        for (const r of grouped) addScope(r.chapter, r.lesson, Number(r.n) || 0);
+      } catch {
+        const limit = 1000;
+        for (let offset = 0; ; offset += limit) {
+          const p = eqParams({ grade: gradeValue });
+          p.set('select', 'chapter,lesson');
+          p.set('order', 'id.asc');
+          p.set('limit', String(limit));
+          p.set('offset', String(offset));
+          const rows = await supabaseGet<{ chapter: string; lesson?: string }[]>('questions', p);
+          for (const r of rows) addScope(r.chapter, r.lesson ?? '', 1);
+          if (rows.length < limit) break;
+        }
       }
       const lessons = [...lessonMap.values()];
       const chapters = [...chapterMap.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => a.name.localeCompare(b.name, 'vi'));
@@ -1863,7 +1859,7 @@ export default function App() {
   useEffect(() => { if (tab === 'results' && session) void loadSubmissions(); }, [tab, session]);
   useEffect(() => { if (tab === 'matrix') void loadScopes(); }, [tab, mGrade]);
   useEffect(() => {
-    fetch('/api/ai-chat').then((r) => r.json()).then((d) => setAiStatus(d.enabled ? `AI đã bật: ${(d.providers || []).join(', ')}` : 'AI chưa bật: đặt GROQ_API_KEY hoặc GEMINI_API_KEY trong Vercel')).catch(() => setAiStatus('AI chưa bật'));
+    fetch('/api/ai-chat').then((r) => r.json()).then((d) => { setAiModels(Array.isArray(d.models) ? d.models : []); setAiStatus(d.enabled ? `AI đã bật · ${(d.models || []).length} mô hình miễn phí` : 'AI chưa bật: đặt GROQ_API_KEY hoặc GEMINI_API_KEY trong Vercel'); }).catch(() => setAiStatus('AI chưa bật'));
   }, []);
   useEffect(() => {
     const handler = (e: Event) => { e.preventDefault(); setInstallPrompt(e); };
@@ -1918,11 +1914,11 @@ export default function App() {
     setAiImage(null);
     setAiBusy(true);
     try {
-      const res = await fetch('/api/ai-chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages: next, context: aiContext(), image }) });
+      const res = await fetch('/api/ai-chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages: next, context: aiContext(), image, model: aiModel }) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `AI HTTP ${res.status}`);
       setAiMessages([...next, { role: 'assistant', content: data.text || 'AI chưa trả lời được.' }]);
-      if (data.provider) setAiStatus(`AI đã bật: ${data.provider}`);
+      if (data.modelLabel) setAiStatus(`AI: ${data.modelLabel}`);
     } catch (e) {
       setAiMessages([...next, { role: 'assistant', content: e instanceof Error ? e.message : String(e) }]);
     } finally { setAiBusy(false); }
@@ -1990,7 +1986,7 @@ export default function App() {
           <strong>Chưa cấu hình Supabase.</strong> Hãy đặt <code>VITE_SUPABASE_URL</code> và <code>VITE_SUPABASE_ANON_KEY</code> trong biến môi trường Vercel, chạy <code>supabase/schema.sql</code> và import dữ liệu trước khi dùng.
         </section>
       )}
-      {error && <section className="notice danger no-print">{error}</section>}
+      {error && <section className="notice danger no-print">{error} <button onClick={() => setError('')}>Đóng</button></section>}
       {loading && <p className="muted no-print">Đang tải…</p>}
       {tab !== 'overview' && (
         <section className="page-head no-print">
@@ -2681,6 +2677,12 @@ export default function App() {
       {aiOpen && (
         <section className="ai-panel no-print">
           <div className="ai-head"><strong>Chat AI Toán</strong><span>{aiStatus}</span><button onClick={() => setAiOpen(false)}>×</button></div>
+          <label className="ai-model-picker">Mô hình AI
+            <select value={aiModel} onChange={(e) => { setAiModel(e.target.value); try { localStorage.setItem('toan-thpt-ai-model', e.target.value); } catch { /* ignore */ } }}>
+              <option value="auto">Tự động (miễn phí tốt nhất)</option>
+              {aiModels.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+            </select>
+          </label>
           <div className="ai-messages">{aiMessages.map((m, i) => <div key={i} className={`ai-msg ${m.role}`}><MathText text={m.content} /></div>)}{aiBusy && <div className="ai-msg assistant">AI đang trả lời…</div>}</div>
           {aiImage && <div className="ai-preview"><img src={aiImage.preview} alt="Ảnh bài tập" style={{ maxWidth: 120, borderRadius: 8 }} /><button onClick={() => setAiImage(null)}>Bỏ ảnh</button></div>}<div className="ai-input"><label className="ai-attach">📷 Ảnh<input type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) pickAiImage(f); e.target.value = ''; }} /></label><textarea rows={2} value={aiInput} onChange={(e) => setAiInput(e.target.value)} placeholder="Hỏi AI về bài toán, đề thi, cách giải…" onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void sendAi(); } }} /><button className="primary" onClick={() => void sendAi()} disabled={aiBusy}>Gửi</button></div>
         </section>

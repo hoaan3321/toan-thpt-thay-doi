@@ -328,6 +328,9 @@ td input { width: 90px; min-height: 36px; padding: 6px 8px; }
   .hero-actions button { flex: 1 1 100%; }
 }
 
+.ai-model-picker { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+.ai-model-picker select { flex: 1; min-height: 38px; }
+
 /* ---------- Tỉ lệ ma trận ---------- */
 .ratio-panel { margin: 16px 0; }
 .ratio-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
