@@ -442,6 +442,18 @@ class Dinic {
   }
 }
 
+function standardCells(levelNeed: Record<Level, number>, partNeed: Record<QType, number>, partPoints: Record<QType, number>): Record<Level, Record<QType, number>> | null {
+  if (partNeed.single !== 12 || partNeed.tf !== 4 || partNeed.short !== 4 || partNeed.essay !== 4) return null;
+  if (partPoints.single !== 3 || partPoints.tf !== 3 || partPoints.short !== 2 || partPoints.essay !== 2) return null;
+  if (levelNeed.NB !== 12 || levelNeed.TH !== 7 || levelNeed.VD !== 3 || levelNeed.VDC !== 2) return null;
+  return {
+    NB: { single: 8, tf: 0, short: 2, essay: 2 },
+    TH: { single: 4, tf: 2, short: 1, essay: 0 },
+    VD: { single: 0, tf: 1, short: 1, essay: 1 },
+    VDC: { single: 0, tf: 1, short: 0, essay: 1 },
+  };
+}
+
 function buildCellCounts(
   levelNeed: Record<Level, number>,
   partNeed: Record<QType, number>,
@@ -537,7 +549,7 @@ export default function App() {
   const [scopeChapters, setScopeChapters] = useState<{ name: string; count: number }[]>([]);
   const [scopeLessons, setScopeLessons] = useState<{ name: string; base: string; count: number }[]>([]);
   const [numCodes, setNumCodes] = useState(4);
-  const [levelNeed, setLevelNeed] = useState<Record<Level, number>>({ NB: 7, TH: 7, VD: 6, VDC: 4 });
+  const [levelNeed, setLevelNeed] = useState<Record<Level, number>>({ NB: 12, TH: 7, VD: 3, VDC: 2 });
   const [partNeed, setPartNeed] = useState<Record<QType, number>>({ single: 12, tf: 4, short: 4, essay: 4 });
   const [partPoints, setPartPoints] = useState<Record<QType, number>>({ single: 3, tf: 3, short: 2, essay: 2 });
   const [generated, setGenerated] = useState<GeneratedCode[]>([]);
@@ -1021,7 +1033,8 @@ export default function App() {
           capacity[l] = {} as Record<QType, number>;
           for (const q of QTYPES) capacity[l][q] = buckets[l][q].length;
         }
-        const cells = buildCellCounts(levelNeed, partNeed, capacity);
+        const std = standardCells(levelNeed, partNeed, partPoints);
+        const cells = std && LEVELS.every((l) => QTYPES.every((q) => capacity[l][q] >= std[l][q])) ? std : buildCellCounts(levelNeed, partNeed, capacity);
         if (!cells) {
           const shortages: string[] = [];
           for (const l of LEVELS) {
@@ -1690,7 +1703,7 @@ export default function App() {
           <p className="muted">Tổng điểm đề: {fmtPoints(QTYPES.reduce((s, q) => s + (partNeed[q] > 0 ? partPoints[q] : 0), 0))} điểm. Điểm mỗi câu bằng điểm của phần chia cho số câu của phần đó. Tổng theo mức phải bằng tổng theo phần; thiếu câu sẽ báo rõ.</p>
           <button className="primary" onClick={() => void generateExam()}>Sinh mã đề</button>
           {examLang === 'en' && <p className="muted">Đề tiếng Anh lấy từ kho Toán tiếng Anh theo đúng ma trận mức × phần; thầy in hoặc xuất file trực tiếp ở mục In đề.</p>}
-          {(() => { const cap = {} as Record<Level, Record<QType, number>>; for (const l of LEVELS) { cap[l] = {} as Record<QType, number>; for (const q of QTYPES) cap[l][q] = 999; } const cells = buildCellCounts(levelNeed, partNeed, cap);
+          {(() => { const cap = {} as Record<Level, Record<QType, number>>; for (const l of LEVELS) { cap[l] = {} as Record<QType, number>; for (const q of QTYPES) cap[l][q] = 999; } const cells = standardCells(levelNeed, partNeed, partPoints) ?? buildCellCounts(levelNeed, partNeed, cap);
             const groups: { key: string; label: string; levels: Level[] }[] = [{ key: 'B', label: 'Biết', levels: ['NB'] }, { key: 'H', label: 'Hiểu', levels: ['TH'] }, { key: 'VD', label: 'VD', levels: ['VD', 'VDC'] }];
             const partGroup: Record<QType, string> = { single: 'TNKQ nhiều lựa chọn', tf: 'TNKQ đúng - sai', short: 'TNKQ trả lời ngắn', essay: 'Tự luận' };
             const codeOf: Record<QType, string> = { single: 'TNNLC', tf: 'TNĐS', short: 'TLN', essay: 'TL' };
