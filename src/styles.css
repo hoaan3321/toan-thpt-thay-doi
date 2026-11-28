@@ -105,3 +105,15 @@ button.primary, button.active { background: #2563eb; border-color: #2563eb; }
 .solution-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .solution-grid h3 { margin: 4px 0 6px; color: #166534; }
 @media (max-width: 720px) { .solution-grid { grid-template-columns: 1fr; } }
+
+@keyframes game-shake { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-8px); } 40% { transform: translateX(8px); } 60% { transform: translateX(-5px); } 80% { transform: translateX(5px); } }
+@keyframes game-pop { 0% { transform: scale(0.6); opacity: 0; } 60% { transform: scale(1.15); } 100% { transform: scale(1); opacity: 1; } }
+@keyframes game-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes game-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+@keyframes confetti-fall { 0% { transform: translateY(-10px) rotate(0deg); opacity: 1; } 100% { transform: translateY(90px) rotate(320deg); opacity: 0; } }
+.game-stage { position: relative; text-align: center; padding: 14px 8px; border-radius: 14px; background: linear-gradient(135deg, #e0f2fe, #fef9c3); margin: 8px 0; overflow: hidden; }
+.game-shake { animation: game-shake 0.45s ease; }
+.game-pop { animation: game-pop 0.4s ease; display: inline-block; }
+.game-spin { animation: game-spin 0.8s linear; display: inline-block; }
+.game-float { animation: game-float 1.6s ease-in-out infinite; display: inline-block; }
+.confetti-dot { position: absolute; top: 0; width: 9px; height: 9px; border-radius: 2px; animation: confetti-fall 0.9s ease-in forwards; }
