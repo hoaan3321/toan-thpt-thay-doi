@@ -595,6 +595,7 @@ export default function App() {
   const [gameLang, setGameLang] = useState<'vi' | 'en'>('vi');
   const [gameGrade, setGameGrade] = useState(10);
   const [gameLevel, setGameLevel] = useState('');
+  const [gameLesson, setGameLesson] = useState('');
   const [gameQs, setGameQs] = useState<{ content: string; options: string[]; correctIndex: number; explanation: string; meta: string }[]>([]);
   const [gameIdx, setGameIdx] = useState(0);
   const [gameScore, setGameScore] = useState(0);
@@ -771,7 +772,7 @@ export default function App() {
     try {
       if (gameLang === 'en' && !hasEnglish) { setError('Toán tiếng Anh cần quyền truy cập hoặc đang dùng thử.'); return; }
       const table = gameLang === 'en' ? 'english_questions' : 'questions';
-      const p = eqParams({ grade: gameGrade, qtype: 'single', level: gameLevel || undefined });
+      const p = eqParams({ grade: gameGrade, qtype: 'single', level: gameLevel || undefined, ...(gameLang === 'en' ? { lesson_vi: gameLesson || undefined } : { lesson: gameLesson || undefined }) });
       const total = await supabaseCount(table, p, gameLang === 'en');
       if (!total) { setError('Chưa có câu trắc nghiệm khớp lựa chọn.'); return; }
       p.set('select', '*'); p.set('limit', '60'); p.set('offset', String(Math.floor(Math.random() * Math.max(1, total - 60))));
@@ -2021,12 +2022,14 @@ export default function App() {
             <label>Ngôn ngữ<select value={gameLang} onChange={(e) => setGameLang(e.target.value as 'vi' | 'en')}><option value="vi">Tiếng Việt</option><option value="en">Tiếng Anh</option></select></label>
             <label>Lớp<select value={gameGrade} onChange={(e) => setGameGrade(Number(e.target.value))}><option>10</option><option>11</option><option>12</option></select></label>
             <label>Mức độ<select value={gameLevel} onChange={(e) => setGameLevel(e.target.value)}><option value="">Tất cả</option>{LEVELS.map((l) => <option key={l} value={l}>{l}</option>)}</select></label>
+            <label>Bài<select value={gameLesson} onChange={(e) => setGameLesson(e.target.value)}><option value="">Tất cả bài</option>{ENGLISH_LESSONS[gameGrade].map((l) => <option key={l} value={l}>{l}</option>)}</select></label>
             <button onClick={() => setSoundOn(!soundOn)}>{soundOn ? '🔊 Âm thanh: Bật' : '🔇 Âm thanh: Tắt'}</button>
           </div>
           <div className="filters">{GAME_MODES.map((m) => <button key={m.id} className={gameModeId === m.id ? 'primary' : ''} onClick={() => void startGame(m.id)} title={m.desc}>{m.icon} {m.name}{gameBest[m.id] ? ` (kỷ lục ${gameBest[m.id]})` : ''}</button>)}</div>
           {gameQs.length > 0 && !gameDone && gameQs[gameIdx] && (<section className="card">
             <p><strong>{GAME_MODES.find((m) => m.id === gameModeId)?.icon} {GAME_MODES.find((m) => m.id === gameModeId)?.name}</strong> • Câu {gameIdx + 1}/{gameQs.length} • Điểm: {gameScore} • Chuỗi đúng: {gameStreak} 🔥 • Thời gian: {gameTimeLeft}s{gameLives < 90 ? ` • Mạng: ${gameLives} ❤️` : ''}</p>
-            <p className="muted">{gameQs[gameIdx].meta}</p>
+            <div style={{ background: 'var(--border, #ddd)', borderRadius: 8, height: 10, overflow: 'hidden' }}><div style={{ width: `${((gameIdx + (gamePicked !== null ? 1 : 0)) / gameQs.length) * 100}%`, background: '#16a34a', height: '100%', transition: 'width .4s' }} /></div>
+            <p className="muted">{gameQs[gameIdx].meta} • {GAME_MODES.find((m) => m.id === gameModeId)?.desc}</p>
             <MathText text={gameQs[gameIdx].content} />
             <div className="filters">{gameQs[gameIdx].options.map((op, i) => <button key={i} disabled={gamePicked !== null} className={gamePicked !== null && i === gameQs[gameIdx].correctIndex ? 'primary' : ''} onClick={() => answerGame(i)}>{String.fromCharCode(65 + i)}. <MathText text={op} /></button>)}</div>
             {gamePicked !== null && <p>{gamePicked === gameQs[gameIdx].correctIndex ? '🎉 Đúng rồi!' : '😢 Chưa đúng.'} <MathText text={gameQs[gameIdx].explanation} /></p>}
