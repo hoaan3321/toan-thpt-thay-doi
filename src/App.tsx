@@ -1939,14 +1939,6 @@ export default function App() {
             <button className="header-icon-btn hamburger" onClick={() => { setShowMobileMenu(!showMobileMenu); setShowAccountMenu(false); }} aria-label="Mở menu chức năng">☰</button>
           </div>
         </div>
-        {(
-          <nav className={`app-nav mobile-menu ${showMobileMenu ? 'open' : ''}`} aria-label="Menu chức năng">
-            <section><h3>Đề thi & câu hỏi</h3><button className={tab === 'matrix' ? 'active' : 'hot'} onClick={() => goTab('matrix')}>Tạo đề theo ma trận</button><button className={tab === 'bank' ? 'active' : ''} onClick={() => goTab('bank')}>Ngân hàng câu hỏi</button><button className={tab === 'print' ? 'active' : ''} onClick={() => goTab('print')}>In đề / đáp án</button><button className={tab === 'admin' ? 'active' : ''} onClick={() => goTab('admin')}>Quản trị câu hỏi</button></section>
-            <section><h3>Lớp học & kết quả</h3><button className={tab === 'assign' ? 'active' : ''} onClick={() => goTab('assign')}>Lớp học & giao bài</button><button className={tab === 'take' ? 'active' : ''} onClick={() => goTab('take')}>Học sinh làm bài</button><button className={tab === 'results' ? 'active' : ''} onClick={() => goTab('results')}>Kết quả / Thống kê</button><button className={tab === 'payment' ? 'active' : ''} onClick={() => goTab('payment')}>Thanh toán / gia hạn</button>{isAdmin && <button className={tab === 'users' ? 'active' : ''} onClick={() => goTab('users')}>Quản lý người dùng</button>}</section>
-            <section><h3>Dạy học & học liệu</h3><button className={tab === 'theory' ? 'active' : ''} onClick={() => goTab('theory')}>Lý thuyết</button><button className={tab === 'english' ? 'active' : ''} onClick={() => goTab('english')}>Toán tiếng Anh</button><button className={tab === 'practice' ? 'active' : ''} onClick={() => goTab('practice')}>Tự luyện</button><button className={tab === 'news' ? 'active' : ''} onClick={() => goTab('news')}>Tin giáo dục</button></section>
-            <section><h3>Trò chơi ôn tập</h3><button className={tab === 'games' ? 'active' : ''} onClick={() => goTab('games')}>Trò chơi 3D</button></section>
-          </nav>
-        )}
         {(showAccountMenu || recoveryToken) && (
           <section className="account-panel">
             {recoveryToken ? (
@@ -1975,6 +1967,14 @@ export default function App() {
           </section>
         )}
       </header>
+        {(
+          <nav className={`app-nav mobile-menu ${showMobileMenu ? 'open' : ''}`} aria-label="Menu chức năng">
+            <section><h3>Đề thi & câu hỏi</h3><button className={tab === 'matrix' ? 'active' : 'hot'} onClick={() => goTab('matrix')}>Tạo đề theo ma trận</button><button className={tab === 'bank' ? 'active' : ''} onClick={() => goTab('bank')}>Ngân hàng câu hỏi</button><button className={tab === 'print' ? 'active' : ''} onClick={() => goTab('print')}>In đề / đáp án</button><button className={tab === 'admin' ? 'active' : ''} onClick={() => goTab('admin')}>Quản trị câu hỏi</button></section>
+            <section><h3>Lớp học & kết quả</h3><button className={tab === 'assign' ? 'active' : ''} onClick={() => goTab('assign')}>Lớp học & giao bài</button><button className={tab === 'take' ? 'active' : ''} onClick={() => goTab('take')}>Học sinh làm bài</button><button className={tab === 'results' ? 'active' : ''} onClick={() => goTab('results')}>Kết quả / Thống kê</button><button className={tab === 'payment' ? 'active' : ''} onClick={() => goTab('payment')}>Thanh toán / gia hạn</button>{isAdmin && <button className={tab === 'users' ? 'active' : ''} onClick={() => goTab('users')}>Quản lý người dùng</button>}</section>
+            <section><h3>Dạy học & học liệu</h3><button className={tab === 'theory' ? 'active' : ''} onClick={() => goTab('theory')}>Lý thuyết</button><button className={tab === 'english' ? 'active' : ''} onClick={() => goTab('english')}>Toán tiếng Anh</button><button className={tab === 'practice' ? 'active' : ''} onClick={() => goTab('practice')}>Tự luyện</button><button className={tab === 'news' ? 'active' : ''} onClick={() => goTab('news')}>Tin giáo dục</button></section>
+            <section><h3>Trò chơi ôn tập</h3><button className={tab === 'games' ? 'active' : ''} onClick={() => goTab('games')}>Trò chơi 3D</button></section>
+          </nav>
+        )}
       {showInstallHelp && (
         <section className="notice no-print">
           <strong>Cài ứng dụng:</strong> Android mở bằng Chrome rồi bấm <b>Cài ứng dụng</b> hoặc menu ⋮ → <b>Cài đặt ứng dụng</b>. iPhone mở bằng Safari → <b>Chia sẻ</b> → <b>Thêm vào màn hình chính</b>. <button onClick={() => setShowInstallHelp(false)}>Đóng</button>
