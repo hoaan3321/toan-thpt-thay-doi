@@ -656,6 +656,7 @@ export default function App() {
   const [mLesson, setMLesson] = useState('');
   const [selectedChapters, setSelectedChapters] = useState<string[]>([]);
   const [selectedLessons, setSelectedLessons] = useState<string[]>([]);
+  const [excludedLessons, setExcludedLessons] = useState<string[]>([]);
   const [scopeChapters, setScopeChapters] = useState<{ name: string; count: number }[]>([]);
   const [scopeLessons, setScopeLessons] = useState<{ name: string; base: string; count: number }[]>([]);
   const [numCodes, setNumCodes] = useState(4);
@@ -1293,7 +1294,7 @@ export default function App() {
       }
       let pool = erows;
       if (scopeMode === 'lesson') { const titles = new Set(selectedLessons.map((l) => lessonTitle(l))); pool = pool.filter((q) => titles.has(q.lesson_vi)); }
-      if (scopeMode === 'chapter') { const titles = new Set(scopeLessons.filter((l) => selectedChapters.includes(baseChapter(l.name))).map((l) => lessonTitle(l.name))); pool = pool.filter((q) => titles.has(q.lesson_vi)); }
+      if (scopeMode === 'chapter') { const titles = new Set(scopeLessons.filter((l) => selectedChapters.includes(baseChapter(l.name)) && !excludedLessons.includes(l.name)).map((l) => lessonTitle(l.name))); pool = pool.filter((q) => titles.has(q.lesson_vi)); }
       return pool.map((q) => ({ id: 900000000 + q.id, grade: q.grade, chapter: q.lesson_vi, lesson: q.lesson_vi, dang: q.dang, level: q.level as Level, qtype: q.qtype, content: q.problem, options: q.options ?? [], correct: q.answer, explanation: q.solution_en, points: 0 }));
     }
     const p = eqParams({ grade: mGrade });
@@ -1309,7 +1310,7 @@ export default function App() {
       all.push(...rows);
       if (rows.length < limit) break;
     }
-    if (scopeMode === 'chapter') return all.filter((q) => selectedChapters.includes(baseChapter(q.chapter)));
+    if (scopeMode === 'chapter') return all.filter((q) => selectedChapters.includes(baseChapter(q.chapter)) && !excludedLessons.includes(`${baseChapter(q.chapter)} — ${(q.lesson ?? '').trim() || lessonTitle(q.chapter)}`));
     if (scopeMode === 'lesson') {
       return all.filter((q) => selectedLessons.some((l) => baseChapter(q.chapter) === baseChapter(l) && ((q.lesson ?? '').trim() === lessonTitle(l) || lessonKey(q.chapter) === lessonKey(l))));
     }
@@ -1324,7 +1325,7 @@ export default function App() {
       title: examTitle.trim() || `Đề Toán lớp ${mGrade}`,
       grade: mGrade,
       scope_chapter: scopeMode === 'chapter' ? selectedChapters.join('; ') : scopeMode === 'lesson' ? [...new Set(selectedLessons.map((l) => baseChapter(l)))].join('; ') : '',
-      scope_lesson: scopeMode === 'lesson' ? selectedLessons.join('; ') : '',
+      scope_lesson: scopeMode === 'lesson' ? selectedLessons.join('; ') : scopeMode === 'chapter' ? scopeLessons.filter((l) => selectedChapters.includes(baseChapter(l.name)) && !excludedLessons.includes(l.name)).map((l) => l.name).join('; ') : '',
       matrix: { levelNeed, partNeed, partPoints, examLang },
       codes: codes.map((c) => ({ code: c.code, questionIds: c.questions.map((q) => q.id), questionPoints: c.questions.map((q) => Number(q.points || 0)), rawPoints: c.rawPoints })),
       duration_minutes: duration,
@@ -1368,6 +1369,7 @@ export default function App() {
         return;
       }
       if (scopeMode === 'chapter' && !selectedChapters.length) { setMatrixMsg('Thầy tích ít nhất một chương nhé.'); return; }
+      if (scopeMode === 'chapter' && !scopeLessons.some((l) => selectedChapters.includes(baseChapter(l.name)) && !excludedLessons.includes(l.name))) { setMatrixMsg('Thầy tích ít nhất một bài trong chương nhé.'); return; }
       if (scopeMode === 'lesson' && !selectedLessons.length) { setMatrixMsg('Thầy tích ít nhất một bài nhé.'); return; }
       const pool = await loadScopedPool();
       const buckets = {} as Record<Level, Record<QType, Question[]>>;
@@ -1728,7 +1730,7 @@ export default function App() {
     for (const l of LEVELS) { cap[l] = {} as Record<QType, number>; for (const q of QTYPES) cap[l][q] = 999; }
     const cells = standardCells(levelNeed, partNeed, partPoints) ?? buildCellCounts(levelNeed, partNeed, cap);
     const groups: { key: string; label: string; levels: Level[] }[] = [{ key: 'B', label: 'Biết', levels: ['NB'] }, { key: 'H', label: 'Hiểu', levels: ['TH'] }, { key: 'VD', label: 'VD', levels: ['VD', 'VDC'] }];
-    const lessonsAll = scopeLessons.filter((l) => scopeMode === 'all' || (scopeMode === 'chapter' ? selectedChapters.includes(baseChapter(l.name)) : selectedLessons.includes(l.name)));
+    const lessonsAll = scopeLessons.filter((l) => scopeMode === 'all' || (scopeMode === 'chapter' ? (selectedChapters.includes(baseChapter(l.name)) && !excludedLessons.includes(l.name)) : selectedLessons.includes(l.name)));
     const lessons = lessonsAll.length ? lessonsAll : [{ name: lessonTitle(mLesson) || `Toàn khối ${mGrade}`, count: 0 }];
     const dist: Record<string, number>[] = lessons.map(() => ({}));
     if (cells) { const weights = lessons.map((l) => lessonPeriods[lessonTitle(l.name) || l.name] ?? 1); for (const q of QTYPES) { for (const g of groups) { const total = g.levels.reduce((a, l) => a + cells[l][q], 0); const alloc = distributeByWeights(total, weights); alloc.forEach((v, idx) => { if (v > 0) dist[idx][`${q}|${g.key}`] = v; }); } } }
@@ -2217,7 +2219,7 @@ export default function App() {
             <label>Ngôn ngữ đề<select value={examLang} onChange={(e) => setExamLang(e.target.value as 'vi' | 'en')}><option value="vi">Tiếng Việt</option><option value="en">Tiếng Anh</option></select></label>
             <label>Lớp<select value={mGrade} onChange={(e) => { setMGrade(Number(e.target.value)); setMChapter(''); setMLesson(''); setSelectedChapters([]); setSelectedLessons([]); }}><option>10</option><option>11</option><option>12</option></select></label>
             <label>Phạm vi<select value={scopeMode} onChange={(e) => setScopeMode(e.target.value as 'all' | 'chapter' | 'lesson')}><option value="all">Toàn khối</option><option value="chapter">Theo chương</option><option value="lesson">Theo bài</option></select></label>
-            {scopeMode === 'chapter' && <div className="scope-checks"><strong>Tích nhiều chương cần kiểm tra ({selectedChapters.length}/{scopeChapters.length})</strong><div className="filters"><button type="button" onClick={() => setSelectedChapters(scopeChapters.map((c) => c.name))}>Chọn tất cả chương</button><button type="button" onClick={() => setSelectedChapters([])}>Bỏ chọn</button></div>{scopeChapters.length === 0 && <span className="muted">Đang tải danh sách chương…</span>}{scopeChapters.map((c) => <label key={c.name}><input type="checkbox" checked={selectedChapters.includes(c.name)} onChange={(e) => setSelectedChapters(e.target.checked ? [...selectedChapters, c.name] : selectedChapters.filter((x) => x !== c.name))} /> {c.name} ({c.count} câu)</label>)}</div>}
+            {scopeMode === 'chapter' && <div className="scope-checks"><strong>Tích chương, rồi tích/bỏ từng bài trong chương ({scopeLessons.filter((l) => selectedChapters.includes(baseChapter(l.name)) && !excludedLessons.includes(l.name)).length} bài đang chọn)</strong><div className="filters"><button type="button" onClick={() => { setSelectedChapters(scopeChapters.map((c) => c.name)); setExcludedLessons([]); }}>Chọn tất cả chương và bài</button><button type="button" onClick={() => { setSelectedChapters([]); setExcludedLessons([]); }}>Bỏ chọn</button></div>{scopeChapters.length === 0 && <span className="muted">Đang tải danh sách chương…</span>}{scopeChapters.map((c) => { const chapterLessons = scopeLessons.filter((l) => baseChapter(l.name) === c.name); const chapterOn = selectedChapters.includes(c.name); return (<div key={c.name} className="scope-chapter"><label><input type="checkbox" checked={chapterOn} onChange={(e) => setSelectedChapters(e.target.checked ? [...selectedChapters, c.name] : selectedChapters.filter((x) => x !== c.name))} /> <strong>{c.name}</strong> ({c.count} câu)</label>{chapterOn && <div className="scope-lessons">{chapterLessons.map((l) => <label key={l.name}><input type="checkbox" checked={!excludedLessons.includes(l.name)} onChange={(e) => setExcludedLessons(e.target.checked ? excludedLessons.filter((x) => x !== l.name) : [...excludedLessons, l.name])} /> {lessonTitle(l.name) || l.name} ({l.count} câu)</label>)}</div>}</div>); })}</div>}
             {scopeMode === 'lesson' && <div className="scope-checks"><strong>Tích nhiều bài cần kiểm tra ({selectedLessons.length}/{scopeLessons.length})</strong><div className="filters"><button type="button" onClick={() => setSelectedLessons(scopeLessons.map((l) => l.name))}>Chọn tất cả bài</button><button type="button" onClick={() => setSelectedLessons([])}>Bỏ chọn</button></div>{scopeLessons.length === 0 && <span className="muted">Đang tải danh sách bài…</span>}{scopeLessons.map((l) => <label key={l.name}><input type="checkbox" checked={selectedLessons.includes(l.name)} onChange={(e) => setSelectedLessons(e.target.checked ? [...selectedLessons, l.name] : selectedLessons.filter((x) => x !== l.name))} /> {l.name} ({l.count} câu)</label>)}</div>}
             <label>Số mã đề<input type="number" min={1} max={50} value={numCodes} onChange={(e) => setNumCodes(Math.max(1, Math.min(50, Number(e.target.value))))} /></label>
           </div>
@@ -2251,7 +2253,7 @@ export default function App() {
             ];
             const compCounts = distributeByWeights(totalQ, compRows.map((r) => r.pts));
             const tnkqPts = (partNeed.single > 0 ? partPoints.single : 0) + (partNeed.tf > 0 ? partPoints.tf : 0) + (partNeed.short > 0 ? partPoints.short : 0);
-            const scopeListRaw = scopeLessons.filter((l) => scopeMode === 'all' || (scopeMode === 'chapter' ? selectedChapters.includes(baseChapter(l.name)) : selectedLessons.includes(l.name)));
+            const scopeListRaw = scopeLessons.filter((l) => scopeMode === 'all' || (scopeMode === 'chapter' ? (selectedChapters.includes(baseChapter(l.name)) && !excludedLessons.includes(l.name)) : selectedLessons.includes(l.name)));
             const scopeList = scopeListRaw.length ? scopeListRaw : ENGLISH_LESSONS[mGrade].map((name) => ({ name, base: '', count: 0 }));
             const totalPeriods = scopeList.reduce((a, l) => a + (lessonPeriods[lessonTitle(l.name) || l.name] ?? 1), 0);
             return (
@@ -2305,7 +2307,7 @@ export default function App() {
             const partGroup: Record<QType, string> = { single: 'TNKQ nhiều lựa chọn', tf: 'TNKQ đúng - sai', short: 'TNKQ trả lời ngắn', essay: 'Tự luận' };
             const codeOf: Record<QType, string> = { single: 'TNNLC', tf: 'TNĐS', short: 'TLN', essay: 'TL' };
             const yeuCau: Record<string, string> = { B: 'Nhận biết: nhận biết được các khái niệm, định nghĩa, tính chất cơ bản của nội dung.', H: 'Thông hiểu: hiểu và áp dụng trực tiếp kiến thức, tính chất vào bài toán quen thuộc.', VD: 'Vận dụng: vận dụng kiến thức để giải quyết bài toán, kể cả bài toán thực tiễn.' };
-            const lessonsAll = scopeLessons.filter((l) => scopeMode === 'all' || (scopeMode === 'chapter' ? selectedChapters.includes(baseChapter(l.name)) : selectedLessons.includes(l.name)));
+            const lessonsAll = scopeLessons.filter((l) => scopeMode === 'all' || (scopeMode === 'chapter' ? (selectedChapters.includes(baseChapter(l.name)) && !excludedLessons.includes(l.name)) : selectedLessons.includes(l.name)));
             const lessons = lessonsAll.length ? lessonsAll : [{ name: lessonTitle(mLesson) || `Toàn khối ${mGrade}`, count: 0 }];
             const dist: Record<string, number>[] = lessons.map(() => ({}));
             if (cells) { const weights = lessons.map((l) => lessonPeriods[lessonTitle(l.name) || l.name] ?? 1); for (const q of QTYPES) { for (const g of groups) { const total = g.levels.reduce((a, l) => a + cells[l][q], 0); const alloc = distributeByWeights(total, weights); alloc.forEach((v, idx) => { if (v > 0) dist[idx][`${q}|${g.key}`] = v; }); } } }
