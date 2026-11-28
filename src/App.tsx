@@ -79,6 +79,26 @@ const PAYMENT_PACKAGES = [
   { days: 30, amount: 99000, label: 'Gói 30 ngày', desc: 'Gia hạn full tính năng trong 30 ngày, tiết kiệm hơn gói 7 ngày.' },
 ];
 
+interface PaymentSettings {
+  id: number;
+  bank_id: string;
+  account_number: string;
+  account_name: string;
+  updated_at?: string;
+}
+
+function paymentQrUrl(settings: PaymentSettings | null, req: PaymentRequest): string {
+  const bankId = (settings?.bank_id || '').trim().toUpperCase();
+  const accountNumber = (settings?.account_number || '').replace(/\s+/g, '');
+  const accountName = (settings?.account_name || '').trim();
+  const code = (req.transfer_code || '').trim();
+  const amount = Math.round(Number(req.amount || 0));
+  if (!bankId || !accountNumber || !code || !amount) return '';
+  const params = new URLSearchParams({ amount: String(amount), addInfo: code });
+  if (accountName) params.set('accountName', accountName);
+  return `https://img.vietqr.io/image/${encodeURIComponent(bankId)}-${encodeURIComponent(accountNumber)}-compact2.png?${params.toString()}`;
+}
+
 
 const NEWS_SOURCES = [
   { title: 'Tin tức Bộ Giáo dục và Đào tạo', desc: 'Tin hoạt động của Bộ, thông cáo báo chí, tin tổng hợp giáo dục.', url: 'https://moet.gov.vn/tin-tuc' },
@@ -623,6 +643,11 @@ export default function App() {
   const [paymentMsg, setPaymentMsg] = useState('');
   const [paymentTransactions, setPaymentTransactions] = useState<PaymentTransaction[]>([]);
   const [paymentLastCheck, setPaymentLastCheck] = useState('');
+  const [paymentSettings, setPaymentSettings] = useState<PaymentSettings | null>(null);
+  const [paymentBankId, setPaymentBankId] = useState('TPB');
+  const [paymentAccountNumber, setPaymentAccountNumber] = useState('');
+  const [paymentAccountName, setPaymentAccountName] = useState('');
+  const [paymentSettingsMsg, setPaymentSettingsMsg] = useState('');
   const [practiceMode, setPracticeMode] = useState<'vi' | 'en'>('vi');
   const [practiceGrade, setPracticeGrade] = useState('12');
   const [practiceLevel, setPracticeLevel] = useState('');
@@ -761,6 +786,36 @@ export default function App() {
     setMatrixMsg('Đã gửi yêu cầu cấp quyền Toán tiếng Anh tới quản trị.');
   }
 
+  async function loadPaymentSettings() {
+    if (!session?.user?.id) { setPaymentSettings(null); return; }
+    try {
+      const p = new URLSearchParams({ select: '*', order: 'id.asc', limit: '1' });
+      const rows = await supabaseGet<PaymentSettings[]>('payment_settings', p, true);
+      const row = rows[0] ?? null;
+      setPaymentSettings(row);
+      setPaymentBankId(row?.bank_id || 'TPB');
+      setPaymentAccountNumber(row?.account_number || '');
+      setPaymentAccountName(row?.account_name || '');
+    } catch (e) { setPaymentSettingsMsg(e instanceof Error ? e.message : String(e)); }
+  }
+
+  async function savePaymentSettings() {
+    if (!isAdmin) return;
+    const bankId = paymentBankId.trim().toUpperCase() || 'TPB';
+    const accountNumber = paymentAccountNumber.replace(/\s+/g, '');
+    const accountName = paymentAccountName.trim();
+    if (!accountNumber) { setPaymentSettingsMsg('Thầy nhập số tài khoản nhận tiền trước nhé.'); return; }
+    try {
+      const rows = await supabaseUpdate<PaymentSettings[]>('payment_settings', eqParams({ id: 1 }), { bank_id: bankId, account_number: accountNumber, account_name: accountName, updated_at: new Date().toISOString() }, true);
+      const row = rows[0] ?? { id: 1, bank_id: bankId, account_number: accountNumber, account_name: accountName };
+      setPaymentSettings(row);
+      setPaymentBankId(row.bank_id);
+      setPaymentAccountNumber(row.account_number);
+      setPaymentAccountName(row.account_name);
+      setPaymentSettingsMsg('Đã lưu cấu hình QR nhận tiền.');
+    } catch (e) { setPaymentSettingsMsg(e instanceof Error ? e.message : String(e)); }
+  }
+
   async function loadPaymentRequests() {
     if (!session?.user?.id) { setPaymentRequests([]); setPaymentTransactions([]); return; }
     try {
@@ -790,7 +845,7 @@ export default function App() {
     const note = transferCode;
     try {
       await supabaseInsert<PaymentRequest[]>('payment_requests', { user_id: session.user.id, email: session.user.email ?? '', package_days: pack.days, amount: pack.amount, status: 'pending', note, transfer_code: transferCode }, true);
-      setPaymentMsg(`Đã tạo giao dịch ${pack.label} — ${pack.amount.toLocaleString('vi-VN')}đ. Nội dung chuyển khoản: ${transferCode}. App tự kiểm tra mỗi 10 giây; khi thanh toán hoàn thành, hệ thống tự cộng ${pack.days} ngày.`);
+      setPaymentMsg(`Đã tạo giao dịch ${pack.label} — ${pack.amount.toLocaleString('vi-VN')}đ. Quét QR bên dưới hoặc chuyển khoản với nội dung: ${transferCode}. App tự kiểm tra mỗi 10 giây; khi thanh toán hoàn thành, hệ thống tự cộng ${pack.days} ngày.`);
       await loadPaymentRequests();
     } catch (e) { setPaymentMsg(e instanceof Error ? e.message : String(e)); }
   }
@@ -1699,7 +1754,7 @@ export default function App() {
   useEffect(() => { if (session) { void loadProfile(); } else setProfile(null); }, [session]);
   useEffect(() => { if (session && canTeach) void loadTeacherData(); }, [session, canTeach]);
   useEffect(() => { if ((tab === 'admin' || tab === 'users' || tab === 'payment') && isAdmin) void loadProfiles(); }, [tab, isAdmin]);
-  useEffect(() => { if (tab === 'payment') void loadPaymentRequests(); }, [tab, session, isAdmin]);
+  useEffect(() => { if (tab === 'payment') { void loadPaymentRequests(); void loadPaymentSettings(); } }, [tab, session, isAdmin]);
   useEffect(() => { if (tab !== 'payment' || !session) return; const t = window.setInterval(() => { void loadPaymentRequests(); }, 10000); return () => window.clearInterval(t); }, [tab, session, isAdmin]);
   useEffect(() => { if (tab === 'results' && session) void loadSubmissions(); }, [tab, session]);
   useEffect(() => { if (tab === 'matrix') void loadScopes(); }, [tab, mGrade]);
@@ -2314,8 +2369,10 @@ export default function App() {
                 </article>
               ))}
             </div>
-            {session && <div className="filters"><button className="primary" onClick={() => void createPaymentRequest()}>Tạo giao dịch gia hạn {paymentPackage} ngày</button><button onClick={() => void checkPaymentNow()}>Kiểm tra thanh toán ngay</button><span className="muted">Sau khi tạo giao dịch, chuyển khoản đúng số tiền và đúng mã giao dịch hiển thị ở lịch sử bên dưới. App tự kiểm tra mỗi 10 giây và tự gia hạn khi thanh toán hoàn thành.</span></div>}
+            {session && <div className="filters"><button className="primary" onClick={() => void createPaymentRequest()}>Tạo giao dịch gia hạn {paymentPackage} ngày</button><button onClick={() => void checkPaymentNow()}>Kiểm tra thanh toán ngay</button><span className="muted">Sau khi tạo giao dịch, quét QR bên dưới để chuyển đúng số tiền và đúng mã giao dịch. App tự kiểm tra mỗi 10 giây và tự gia hạn khi thanh toán hoàn thành.</span></div>}
             {session && (() => { const own = isAdmin ? paymentRequests : paymentRequests.filter((r) => r.user_id === session.user?.id); const paidTotal = own.filter((r) => r.status === 'paid' || r.status === 'approved').reduce((sum, r) => sum + Number(r.amount || 0), 0); const pending = own.filter((r) => r.status === 'pending').length; const daysLeft = profile ? Math.max(0, Math.ceil((new Date(profile.trial_ends_at).getTime() - Date.now()) / 86400000)) : 0; return <div className="grid"><section className="card"><h3>Số dư đã thanh toán</h3><p className="big">{paidTotal.toLocaleString('vi-VN')}đ</p></section><section className="card"><h3>Thời hạn còn lại</h3><p className="big">{isAdmin || profile?.full_access ? 'Full' : `${daysLeft} ngày`}</p></section><section className="card"><h3>Giao dịch chờ hoàn thành</h3><p className="big">{pending}</p><p className="muted">Kiểm tra lần cuối: {paymentLastCheck || '—'}</p></section></div>; })()}
+            {session && (() => { const ownPending = paymentRequests.find((r) => r.user_id === session.user?.id && r.status === 'pending'); if (!ownPending) return null; const code = ownPending.transfer_code || ownPending.note; const qrUrl = paymentQrUrl(paymentSettings, ownPending); const maskedAccount = paymentSettings?.account_number ? `••••${paymentSettings.account_number.slice(-4)}` : ''; return <section className="card payment-qr"><h3>Quét QR để thanh toán</h3>{qrUrl ? <><img src={qrUrl} alt={`QR thanh toán ${code}`} /><p><strong>{ownPending.amount.toLocaleString('vi-VN')}đ</strong> · Gói {ownPending.package_days} ngày</p><p className="meta">{paymentSettings?.bank_id} · {maskedAccount}{paymentSettings?.account_name ? ` · ${paymentSettings.account_name}` : ''}</p><p>Nội dung chuyển khoản: <span className="payment-code">{code}</span></p><div className="filters"><button onClick={() => void navigator.clipboard?.writeText(code)}>Sao chép mã</button><button onClick={() => void checkPaymentNow()}>Kiểm tra thanh toán ngay</button></div></> : <p className="notice">QR chưa sẵn sàng vì quản trị chưa nhập tài khoản nhận tiền. Giao dịch vẫn chờ với mã <span className="payment-code">{code}</span>.</p>}</section>; })()}
+            {isAdmin && <section className="card"><h3>Cấu hình QR nhận tiền</h3><div className="filters"><label>Mã ngân hàng<input value={paymentBankId} onChange={(e) => setPaymentBankId(e.target.value)} placeholder="TPB" /></label><label>Số tài khoản nhận tiền<input value={paymentAccountNumber} onChange={(e) => setPaymentAccountNumber(e.target.value)} placeholder="Nhập số tài khoản TPBank" inputMode="numeric" /></label><label>Tên chủ tài khoản<input value={paymentAccountName} onChange={(e) => setPaymentAccountName(e.target.value)} placeholder="Y DOI BOL" /></label><button className="primary" onClick={() => void savePaymentSettings()}>Lưu cấu hình QR</button></div>{paymentSettingsMsg && <p className="notice">{paymentSettingsMsg}</p>}</section>}
             {paymentMsg && <p className="notice">{paymentMsg}</p>}
           </section>
           <section className="card">
