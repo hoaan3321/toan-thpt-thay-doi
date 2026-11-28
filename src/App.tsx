@@ -1690,16 +1690,38 @@ export default function App() {
           <p className="muted">Tổng điểm đề: {fmtPoints(QTYPES.reduce((s, q) => s + (partNeed[q] > 0 ? partPoints[q] : 0), 0))} điểm. Điểm mỗi câu bằng điểm của phần chia cho số câu của phần đó. Tổng theo mức phải bằng tổng theo phần; thiếu câu sẽ báo rõ.</p>
           <button className="primary" onClick={() => void generateExam()}>Sinh mã đề</button>
           {examLang === 'en' && <p className="muted">Đề tiếng Anh lấy từ kho Toán tiếng Anh theo đúng ma trận mức × phần; thầy in hoặc xuất file trực tiếp ở mục In đề.</p>}
-          {(() => { const cap = {} as Record<Level, Record<QType, number>>; for (const l of LEVELS) { cap[l] = {} as Record<QType, number>; for (const q of QTYPES) cap[l][q] = 999; } const cells = buildCellCounts(levelNeed, partNeed, cap); const levelName: Record<Level, string> = { NB: 'Nhận biết', TH: 'Thông hiểu', VD: 'Vận dụng', VDC: 'Vận dụng cao' }; const yeuCau: Record<Level, string> = { NB: 'Nhận biết, nhắc lại kiến thức cơ bản', TH: 'Hiểu và áp dụng trực tiếp kiến thức', VD: 'Vận dụng kiến thức để giải quyết bài toán quen thuộc', VDC: 'Vận dụng linh hoạt, sáng tạo vào bài toán phức tạp' }; const scopeLabel = scopeMode === 'all' ? `Toàn khối ${mGrade}` : scopeMode === 'chapter' ? mChapter : lessonTitle(mLesson); return (<>
+          {(() => { const cap = {} as Record<Level, Record<QType, number>>; for (const l of LEVELS) { cap[l] = {} as Record<QType, number>; for (const q of QTYPES) cap[l][q] = 999; } const cells = buildCellCounts(levelNeed, partNeed, cap);
+            const groups: { key: string; label: string; levels: Level[] }[] = [{ key: 'B', label: 'Biết', levels: ['NB'] }, { key: 'H', label: 'Hiểu', levels: ['TH'] }, { key: 'VD', label: 'VD', levels: ['VD', 'VDC'] }];
+            const partGroup: Record<QType, string> = { single: 'TNKQ nhiều lựa chọn', tf: 'TNKQ đúng - sai', short: 'TNKQ trả lời ngắn', essay: 'Tự luận' };
+            const codeOf: Record<QType, string> = { single: 'TNNLC', tf: 'TNĐS', short: 'TLN', essay: 'TL' };
+            const yeuCau: Record<string, string> = { B: 'Nhận biết: nhận biết được các khái niệm, định nghĩa, tính chất cơ bản của nội dung.', H: 'Thông hiểu: hiểu và áp dụng trực tiếp kiến thức, tính chất vào bài toán quen thuộc.', VD: 'Vận dụng: vận dụng kiến thức để giải quyết bài toán, kể cả bài toán thực tiễn.' };
+            const lessonsAll = scopeLessons.filter((l) => scopeMode === 'all' || (scopeMode === 'chapter' ? baseChapter(l.name) === mChapter : lessonTitle(l.name) === lessonTitle(mLesson)));
+            const lessons = lessonsAll.length ? lessonsAll : [{ name: lessonTitle(mLesson) || `Toàn khối ${mGrade}`, count: 0 }];
+            const dist: Record<string, number>[] = lessons.map(() => ({}));
+            if (cells) { let seed = 0; for (const q of QTYPES) { for (const g of groups) { const total = g.levels.reduce((a, l) => a + cells[l][q], 0); for (let i = 0; i < total; i++) { const idx = (seed + i) % lessons.length; dist[idx][`${q}|${g.key}`] = (dist[idx][`${q}|${g.key}`] ?? 0) + 1; } seed += 1; } } }
+            const ptsOf = (i: number, q: QType, gk: string) => (partNeed[q] > 0 ? (dist[i][`${q}|${gk}`] ?? 0) * (partPoints[q] / partNeed[q]) : 0);
+            const totalPts = QTYPES.reduce((a, q) => a + (partNeed[q] > 0 ? partPoints[q] : 0), 0);
+            const pct = (v: number) => `${(totalPts > 0 ? (v / totalPts) * 100 : 0).toFixed(1).replace('.', ',')}%`;
+            const chapters: { name: string; idx: number[] }[] = [];
+            lessons.forEach((l, i) => { const ch = baseChapter(l.name) || l.name; const f = chapters.find((c) => c.name === ch); if (f) f.idx.push(i); else chapters.push({ name: ch, idx: [i] }); });
+            return (<>
             <h3>Ma trận đề</h3>
-            <div style={{ overflowX: 'auto' }}><table><thead><tr><th>Phần</th>{LEVELS.map((l) => <th key={l}>{levelName[l]}</th>)}<th>Tổng câu</th><th>Điểm</th></tr></thead><tbody>
-              {QTYPES.map((q) => <tr key={q}><td>{QTYPE_LABEL[q]}</td>{LEVELS.map((l) => <td key={l}>{cells ? cells[l][q] : 0}</td>)}<td>{partNeed[q]}</td><td>{fmtPoints(partPoints[q])}</td></tr>)}
-              <tr><td><strong>Tổng</strong></td>{LEVELS.map((l) => <td key={l}><strong>{levelNeed[l]}</strong></td>)}<td><strong>{QTYPES.reduce((a, q) => a + partNeed[q], 0)}</strong></td><td><strong>{fmtPoints(QTYPES.reduce((a, q) => a + (partNeed[q] > 0 ? partPoints[q] : 0), 0))}</strong></td></tr>
+            <div style={{ overflowX: 'auto' }}><table><thead>
+              <tr><th rowSpan={3}>TT</th><th rowSpan={3}>Chương/chủ đề</th><th rowSpan={3}>Nội dung/đơn vị kiến thức</th><th colSpan={12}>Mức độ đánh giá</th><th colSpan={3}>Tổng</th><th rowSpan={3}>Tỉ lệ % điểm</th></tr>
+              <tr>{QTYPES.map((q) => <th key={q} colSpan={3}>{partGroup[q]}</th>)}<th colSpan={3}></th></tr>
+              <tr>{QTYPES.flatMap((q) => groups.map((g) => <th key={`${q}${g.key}`}>{g.label}</th>))}{groups.map((g) => <th key={g.key}>{g.label}</th>)}</tr>
+            </thead><tbody>
+              {chapters.map((ch, ci) => ch.idx.map((i, ri) => { const lp = QTYPES.reduce((a, q) => a + groups.reduce((b, g) => b + ptsOf(i, q, g.key), 0), 0); return (<tr key={i}>{ri === 0 && <td rowSpan={ch.idx.length}>{ci + 1}</td>}{ri === 0 && <td rowSpan={ch.idx.length}>{ch.name}</td>}<td>{lessonTitle(lessons[i].name)}</td>{QTYPES.flatMap((q) => groups.map((g) => <td key={`${q}${g.key}`}>{dist[i][`${q}|${g.key}`] || ''}</td>))}{groups.map((g) => <td key={g.key}><strong>{QTYPES.reduce((a, q) => a + (dist[i][`${q}|${g.key}`] ?? 0), 0) || ''}</strong></td>)}<td>{pct(lp)}</td></tr>); }))}
+              <tr><td colSpan={3}><strong>Tổng số câu</strong></td>{QTYPES.flatMap((q) => groups.map((g) => <td key={`${q}${g.key}`}>{cells ? g.levels.reduce((a, l) => a + cells[l][q], 0) : 0}</td>))}{groups.map((g) => <td key={g.key}><strong>{g.levels.reduce((a, l) => a + levelNeed[l], 0)}</strong></td>)}<td><strong>100%</strong></td></tr>
+              <tr><td colSpan={3}><strong>Tổng số điểm</strong></td>{QTYPES.map((q) => <td key={q} colSpan={3}>{fmtPoints(partPoints[q])}</td>)}{groups.map((g) => <td key={g.key}>{fmtPoints(QTYPES.reduce((a, q) => a + (partNeed[q] > 0 && cells ? g.levels.reduce((b, l) => b + cells[l][q], 0) * (partPoints[q] / partNeed[q]) : 0), 0))}</td>)}<td>{fmtPoints(totalPts)}</td></tr>
+              <tr><td colSpan={3}><strong>Tỉ lệ %</strong></td>{QTYPES.map((q) => <td key={q} colSpan={3}>{pct(partPoints[q])}</td>)}{groups.map((g) => <td key={g.key}>{pct(QTYPES.reduce((a, q) => a + (partNeed[q] > 0 && cells ? g.levels.reduce((b, l) => b + cells[l][q], 0) * (partPoints[q] / partNeed[q]) : 0), 0))}</td>)}<td>100%</td></tr>
             </tbody></table></div>
-            <h3>Ma trận đặc tả</h3>
-            <p className="muted">Theo hướng dẫn của Bộ GD&ĐT về ma trận đề kiểm tra và bản đặc tả.</p>
-            <div style={{ overflowX: 'auto' }}><table><thead><tr><th>TT</th><th>Nội dung</th><th>Phần</th><th>Mức độ</th><th>Số câu</th><th>Điểm</th><th>Yêu cầu cần đạt</th></tr></thead><tbody>
-              {cells ? QTYPES.flatMap((q) => LEVELS.filter((l) => cells[l][q] > 0).map((l) => ({ q, l }))).map(({ q, l }, i) => <tr key={`${q}-${l}`}><td>{i + 1}</td><td>{scopeLabel}</td><td>{QTYPE_LABEL[q]}</td><td>{levelName[l]}</td><td>{cells[l][q]}</td><td>{fmtPoints(partNeed[q] > 0 ? (partPoints[q] / partNeed[q]) * cells[l][q] : 0)}</td><td>{yeuCau[l]}</td></tr>) : <tr><td colSpan={7}>Tổng theo mức phải bằng tổng theo phần để lập đặc tả.</td></tr>}
+            <h3>Bảng đặc tả</h3>
+            <div style={{ overflowX: 'auto' }}><table><thead>
+              <tr><th rowSpan={2}>STT</th><th rowSpan={2}>Chương/chủ đề</th><th rowSpan={2}>Nội dung</th><th rowSpan={2}>Mức độ kiểm tra, đánh giá</th><th colSpan={3}>Số câu hỏi theo mức độ nhận thức</th></tr>
+              <tr><th>Nhận biết</th><th>Thông hiểu</th><th>Vận dụng</th></tr>
+            </thead><tbody>
+              {chapters.map((ch, ci) => ch.idx.map((i, ri) => (<tr key={i}>{ri === 0 && <td rowSpan={ch.idx.length}>{ci + 1}</td>}{ri === 0 && <td rowSpan={ch.idx.length}>{ch.name}</td>}<td>{lessonTitle(lessons[i].name)}</td><td>{groups.filter((g) => QTYPES.some((q) => (dist[i][`${q}|${g.key}`] ?? 0) > 0)).map((g) => yeuCau[g.key]).join(' ')}</td>{groups.map((g) => <td key={g.key}>{QTYPES.filter((q) => (dist[i][`${q}|${g.key}`] ?? 0) > 0).map((q) => `${dist[i][`${q}|${g.key}`]}${codeOf[q]}`).join(' ')}</td>)}</tr>)))}
             </tbody></table></div>
           </>); })()}
           <div className="filters">
