@@ -1732,10 +1732,12 @@ export default function App() {
           <AppClock />
           <button className="install-btn" onClick={() => void installApp()}>📲 Cài ứng dụng</button>
         </div>
-        <nav>
-          {([['overview', 'Bảng điều khiển'], ['bank', 'Ngân hàng câu hỏi'], ['theory', 'Lý thuyết'], ['english', 'Toán tiếng Anh'], ['matrix', 'Tạo đề'], ['print', 'In đề'], ['assign', 'Giao bài'], ['take', 'Học sinh làm bài'], ['results', 'Kết quả'], ['practice', 'Tự luyện'], ['games', 'Trò chơi'], ['news', 'Tin giáo dục'], ['payment', 'Thanh toán'], ['admin', 'Quản trị'], ...(isAdmin ? [['users', 'Quản lý người dùng'] as [Tab, string]] : [])] as [Tab, string][]).map(([t, label]) => (
-            <button key={t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)}>{label}</button>
-          ))}
+        <nav className="nav-groups">
+          <section className="nav-group nav-home"><button className={tab === 'overview' ? 'active' : ''} onClick={() => setTab('overview')}>⌂ Trang chủ / Bảng điều khiển</button></section>
+          <section className="nav-group"><h3>Đề thi & câu hỏi</h3><button className={tab === 'matrix' ? 'active' : 'hot'} onClick={() => setTab('matrix')}>▦ Tạo đề theo ma trận</button><button className={tab === 'bank' ? 'active' : ''} onClick={() => setTab('bank')}>▤ Ngân hàng câu hỏi</button><button className={tab === 'print' ? 'active' : ''} onClick={() => setTab('print')}>⎙ In đề / đáp án</button><button className={tab === 'admin' ? 'active' : ''} onClick={() => setTab('admin')}>✎ Quản trị câu hỏi</button></section>
+          <section className="nav-group"><h3>Lớp học & kết quả</h3><button className={tab === 'assign' ? 'active' : ''} onClick={() => setTab('assign')}>👥 Lớp học & giao bài</button><button className={tab === 'take' ? 'active' : ''} onClick={() => setTab('take')}>✍ Học sinh làm bài</button><button className={tab === 'results' ? 'active' : ''} onClick={() => setTab('results')}>📊 Kết quả / Thống kê</button><button className={tab === 'payment' ? 'active' : ''} onClick={() => setTab('payment')}>💳 Thanh toán / gia hạn</button>{isAdmin && <button className={tab === 'users' ? 'active' : ''} onClick={() => setTab('users')}>👤 Quản lý người dùng</button>}</section>
+          <section className="nav-group"><h3>Dạy học & học liệu</h3><button className={tab === 'theory' ? 'active' : ''} onClick={() => setTab('theory')}>📘 Lý thuyết</button><button className={tab === 'english' ? 'active' : ''} onClick={() => setTab('english')}>🇬🇧 Toán tiếng Anh</button><button className={tab === 'practice' ? 'active' : ''} onClick={() => setTab('practice')}>🎯 Tự luyện</button><button className={tab === 'news' ? 'active' : ''} onClick={() => setTab('news')}>📰 Tin giáo dục</button></section>
+          <section className="nav-group"><h3>Trò chơi ôn tập</h3><button className={tab === 'games' ? 'active' : ''} onClick={() => setTab('games')}>🎮 Trò chơi 3D</button></section>
         </nav>
       </header>
       {showInstallHelp && (
@@ -2167,7 +2169,7 @@ export default function App() {
       {tab === 'games' && (
         <main className="card no-print">
           <h2>Trò chơi Toán học</h2>
-          <p className="muted">15 trò chơi biến tấu riêng của Toán THPT Thầy Đôi, lấy câu từ ngân hàng theo lớp và mức độ.</p>
+          <p className="muted">15 trò chơi 3D/thực tế ảo biến tấu riêng của Toán THPT Thầy Đôi, có âm thanh, sân khấu nhập vai và câu hỏi lấy từ ngân hàng theo lớp, bài và mức độ.</p>
           <div className="filters">
             <label>Ngôn ngữ<select value={gameLang} onChange={(e) => setGameLang(e.target.value as 'vi' | 'en')}><option value="vi">Tiếng Việt</option><option value="en">Tiếng Anh</option></select></label>
             <label>Lớp<select value={gameGrade} onChange={(e) => setGameGrade(Number(e.target.value))}><option>10</option><option>11</option><option>12</option></select></label>
@@ -2175,7 +2177,7 @@ export default function App() {
             <label>Bài<select value={gameLesson} onChange={(e) => setGameLesson(e.target.value)}><option value="">Tất cả bài</option>{ENGLISH_LESSONS[gameGrade].map((l) => <option key={l} value={l}>{l}</option>)}</select></label>
             <button onClick={() => setSoundOn(!soundOn)}>{soundOn ? '🔊 Âm thanh: Bật' : '🔇 Âm thanh: Tắt'}</button>
           </div>
-          <div className="filters">{GAME_MODES.map((m) => <button key={m.id} className={gameModeId === m.id ? 'primary' : ''} onClick={() => void startGame(m.id)} title={m.desc}>{m.icon} {m.name}{gameBest[m.id] ? ` (kỷ lục ${gameBest[m.id]})` : ''}</button>)}</div>
+          <div className="game-grid">{GAME_MODES.map((m) => <button key={m.id} className={`game-card ${gameModeId === m.id ? 'active' : ''}`} style={{ background: ({ speed: 'linear-gradient(135deg,#bae6fd,#fef9c3)', race: 'linear-gradient(135deg,#7dd3fc,#bbf7d0)', boss: 'linear-gradient(135deg,#450a0a,#dc2626)', stars: 'linear-gradient(135deg,#111827,#4338ca)', treasure: 'linear-gradient(135deg,#7dd3fc,#fde68a)', tower: 'linear-gradient(135deg,#93c5fd,#86efac)', climb: 'linear-gradient(135deg,#bae6fd,#fef9c3)', wheel: 'linear-gradient(135deg,#fbcfe8,#fef3c7)', streak: 'linear-gradient(135deg,#7c2d12,#facc15)' } as Record<string, string>)[m.id] ?? 'linear-gradient(135deg,#e0f2fe,#fef9c3)' }} onClick={() => void startGame(m.id)} title={m.desc}><span className="game-3d-icon">{m.icon}</span><strong>{m.name}</strong><small>{m.desc}</small>{gameBest[m.id] ? <small>Kỷ lục: {gameBest[m.id]}</small> : null}</button>)}</div>
           {gameQs.length > 0 && !gameDone && gameQs[gameIdx] && (<section className="card">
             <p><strong>{GAME_MODES.find((m) => m.id === gameModeId)?.icon} {GAME_MODES.find((m) => m.id === gameModeId)?.name}</strong> • Câu {gameIdx + 1}/{gameQs.length} • Điểm: {gameScore} • Chuỗi đúng: {gameStreak} 🔥 • Thời gian: {gameTimeLeft}s{gameLives < 90 ? ` • Mạng: ${gameLives} ❤️` : ''}</p>
             <div style={{ background: 'var(--border, #ddd)', borderRadius: 8, height: 10, overflow: 'hidden' }}><div style={{ width: `${((gameIdx + (gamePicked !== null ? 1 : 0)) / gameQs.length) * 100}%`, background: '#16a34a', height: '100%', transition: 'width .4s' }} /></div>
