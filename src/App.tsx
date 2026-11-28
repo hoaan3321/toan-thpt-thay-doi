@@ -5,6 +5,24 @@ import { LEVELS, QTYPES, QTYPE_LABEL, type Assignment, type ClassRecord, type Ex
 
 type Tab = 'overview' | 'bank' | 'theory' | 'english' | 'matrix' | 'print' | 'assign' | 'take' | 'results' | 'admin' | 'users' | 'practice' | 'news' | 'games' | 'payment';
 
+const TAB_META: Record<Tab, { eyebrow: string; title: string; desc: string }> = {
+  overview: { eyebrow: 'Trang chủ', title: 'Toán THPT Thầy Đôi', desc: 'Nền tảng dạy và học Toán THPT.' },
+  bank: { eyebrow: 'Ngân hàng câu hỏi', title: 'Kho câu hỏi Toán 10–12', desc: 'Lọc theo lớp, bài, dạng và mức độ; xem đáp án cùng lời giải chi tiết.' },
+  theory: { eyebrow: 'Học liệu', title: 'Lý thuyết trọng tâm', desc: 'Tóm tắt kiến thức theo chương, trình bày ngắn gọn để dạy và ôn tập.' },
+  english: { eyebrow: 'Toán tiếng Anh', title: 'English Math THPT', desc: 'Bài tập, lời giải song ngữ và từ vựng bắt buộc theo từng bài.' },
+  matrix: { eyebrow: 'Tạo đề', title: 'Tạo đề theo ma trận', desc: 'Sinh nhiều mã đề tương đương, xem ma trận và bảng đặc tả trước khi xuất file.' },
+  print: { eyebrow: 'Xuất bản', title: 'In đề / đáp án', desc: 'Xem bản in chuẩn A4 và xuất DOCX, PDF, LaTeX cho đề và đáp án.' },
+  assign: { eyebrow: 'Lớp học', title: 'Lớp học & giao bài', desc: 'Tạo lớp, nhập học sinh và giao bài bằng mã vào làm bài.' },
+  take: { eyebrow: 'Làm bài trực tuyến', title: 'Học sinh làm bài', desc: 'Nhập mã giao bài để làm bài có bấm giờ và nộp trực tuyến.' },
+  results: { eyebrow: 'Báo cáo', title: 'Kết quả / Thống kê', desc: 'Theo dõi điểm, tỉ lệ đúng và bài nộp của từng học sinh.' },
+  admin: { eyebrow: 'Quản trị', title: 'Quản trị câu hỏi', desc: 'Thêm, sửa và kiểm soát chất lượng ngân hàng câu hỏi.' },
+  users: { eyebrow: 'Quản trị hệ thống', title: 'Quản lý người dùng', desc: 'Cấp quyền giáo viên, học sinh và quyền Toán tiếng Anh.' },
+  practice: { eyebrow: 'Tự luyện', title: 'Luyện tập cá nhân', desc: 'Chọn lớp, bài và mức độ để luyện theo nhịp của riêng bạn.' },
+  news: { eyebrow: 'Cập nhật', title: 'Tin giáo dục', desc: 'Thông tin chính thức từ Bộ Giáo dục và Đào tạo.' },
+  games: { eyebrow: 'Ôn tập vui', title: 'Trò chơi Toán học', desc: '15 trò chơi có âm thanh và sân khấu 3D cho tiết ôn tập sôi nổi.' },
+  payment: { eyebrow: 'Tài khoản', title: 'Thanh toán / gia hạn', desc: 'Gia hạn gói sử dụng bằng chuyển khoản và mã QR tự động xác nhận.' },
+};
+
 interface GeneratedCode {
   code: number;
   questions: Question[];
@@ -516,6 +534,20 @@ class Dinic {
   }
 }
 
+function distributeByWeights(total: number, weights: number[]): number[] {
+  const n = weights.length;
+  if (n === 0 || total <= 0) return weights.map(() => 0);
+  const sum = weights.reduce((a, b) => a + Math.max(0, b), 0);
+  const w = sum > 0 ? weights.map((x) => Math.max(0, x)) : weights.map(() => 1);
+  const s = w.reduce((a, b) => a + b, 0);
+  const raw = w.map((x) => (total * x) / s);
+  const out = raw.map((x) => Math.floor(x));
+  let left = total - out.reduce((a, b) => a + b, 0);
+  const order = raw.map((x, i) => ({ i, frac: x - Math.floor(x) })).sort((a, b) => b.frac - a.frac);
+  for (const o of order) { if (left <= 0) break; out[o.i] += 1; left -= 1; }
+  return out;
+}
+
 function standardCells(levelNeed: Record<Level, number>, partNeed: Record<QType, number>, partPoints: Record<QType, number>): Record<Level, Record<QType, number>> | null {
   if (partNeed.single !== 12 || partNeed.tf !== 4 || partNeed.short !== 4 || partNeed.essay !== 4) return null;
   if (partPoints.single !== 3 || partPoints.tf !== 3 || partPoints.short !== 2 || partPoints.essay !== 2) return null;
@@ -629,6 +661,8 @@ export default function App() {
   const [levelNeed, setLevelNeed] = useState<Record<Level, number>>({ NB: 12, TH: 7, VD: 3, VDC: 2 });
   const [partNeed, setPartNeed] = useState<Record<QType, number>>({ single: 12, tf: 4, short: 4, essay: 4 });
   const [partPoints, setPartPoints] = useState<Record<QType, number>>({ single: 3, tf: 3, short: 2, essay: 2 });
+  const [compPct, setCompPct] = useState<{ tuDuy: number; giaiQuyet: number; moHinh: number }>({ tuDuy: 40, giaiQuyet: 35, moHinh: 25 });
+  const [lessonPeriods, setLessonPeriods] = useState<Record<string, number>>({});
   const [generated, setGenerated] = useState<GeneratedCode[]>([]);
   const [matrixMsg, setMatrixMsg] = useState('');
   const [session, setSession] = useState<AuthSession | null>(() => getSession());
@@ -1668,7 +1702,7 @@ export default function App() {
     const lessonsAll = scopeLessons.filter((l) => scopeMode === 'all' || (scopeMode === 'chapter' ? selectedChapters.includes(baseChapter(l.name)) : selectedLessons.includes(l.name)));
     const lessons = lessonsAll.length ? lessonsAll : [{ name: lessonTitle(mLesson) || `Toàn khối ${mGrade}`, count: 0 }];
     const dist: Record<string, number>[] = lessons.map(() => ({}));
-    if (cells) { let seed = 0; for (const q of QTYPES) { for (const g of groups) { const total = g.levels.reduce((a, l) => a + cells[l][q], 0); for (let i = 0; i < total; i++) { const idx = (seed + i) % lessons.length; dist[idx][`${q}|${g.key}`] = (dist[idx][`${q}|${g.key}`] ?? 0) + 1; } seed += 1; } } }
+    if (cells) { const weights = lessons.map((l) => lessonPeriods[l.name] ?? 1); for (const q of QTYPES) { for (const g of groups) { const total = g.levels.reduce((a, l) => a + cells[l][q], 0); const alloc = distributeByWeights(total, weights); alloc.forEach((v, idx) => { if (v > 0) dist[idx][`${q}|${g.key}`] = v; }); } } }
     const totalPts = QTYPES.reduce((a, q) => a + (partNeed[q] > 0 ? partPoints[q] : 0), 0);
     const ptsOf = (i: number, q: QType, gk: string) => (partNeed[q] > 0 ? (dist[i][`${q}|${gk}`] ?? 0) * (partPoints[q] / partNeed[q]) : 0);
     const pct = (v: number) => `${(totalPts > 0 ? (v / totalPts) * 100 : 0).toFixed(1).replace('.', ',')}%`;
@@ -1901,7 +1935,7 @@ export default function App() {
         <div className="header-row">
           <button className="brand-btn" onClick={() => goTab('overview')} aria-label="Về trang chủ Toán THPT Thầy Đôi">
             <span className="brand-mark">∑</span>
-            <span className="brand-text"><strong>Toán THPT Thầy Đôi</strong><small className="brand-sub">Ngân hàng câu hỏi · Ma trận đề</small></span>
+            <span className="brand-text"><strong>Toán THPT Thầy Đôi</strong><small className="brand-sub">Nền tảng dạy & học Toán THPT</small></span>
           </button>
           <div className="header-actions">
             <span className="header-clock"><AppClock /></span>
@@ -1910,8 +1944,8 @@ export default function App() {
             <button className="header-icon-btn hamburger" onClick={() => { setShowMobileMenu(!showMobileMenu); setShowAccountMenu(false); }} aria-label="Mở menu chức năng">☰</button>
           </div>
         </div>
-        {showMobileMenu && (
-          <nav className="mobile-menu" aria-label="Menu chức năng">
+        {(
+          <nav className={`app-nav mobile-menu ${showMobileMenu ? 'open' : ''}`} aria-label="Menu chức năng">
             <section><h3>Đề thi & câu hỏi</h3><button className={tab === 'matrix' ? 'active' : 'hot'} onClick={() => goTab('matrix')}>Tạo đề theo ma trận</button><button className={tab === 'bank' ? 'active' : ''} onClick={() => goTab('bank')}>Ngân hàng câu hỏi</button><button className={tab === 'print' ? 'active' : ''} onClick={() => goTab('print')}>In đề / đáp án</button><button className={tab === 'admin' ? 'active' : ''} onClick={() => goTab('admin')}>Quản trị câu hỏi</button></section>
             <section><h3>Lớp học & kết quả</h3><button className={tab === 'assign' ? 'active' : ''} onClick={() => goTab('assign')}>Lớp học & giao bài</button><button className={tab === 'take' ? 'active' : ''} onClick={() => goTab('take')}>Học sinh làm bài</button><button className={tab === 'results' ? 'active' : ''} onClick={() => goTab('results')}>Kết quả / Thống kê</button><button className={tab === 'payment' ? 'active' : ''} onClick={() => goTab('payment')}>Thanh toán / gia hạn</button>{isAdmin && <button className={tab === 'users' ? 'active' : ''} onClick={() => goTab('users')}>Quản lý người dùng</button>}</section>
             <section><h3>Dạy học & học liệu</h3><button className={tab === 'theory' ? 'active' : ''} onClick={() => goTab('theory')}>Lý thuyết</button><button className={tab === 'english' ? 'active' : ''} onClick={() => goTab('english')}>Toán tiếng Anh</button><button className={tab === 'practice' ? 'active' : ''} onClick={() => goTab('practice')}>Tự luyện</button><button className={tab === 'news' ? 'active' : ''} onClick={() => goTab('news')}>Tin giáo dục</button></section>
@@ -1959,14 +1993,37 @@ export default function App() {
       )}
       {error && <section className="notice danger no-print">{error}</section>}
       {loading && <p className="muted no-print">Đang tải…</p>}
+      {tab !== 'overview' && (
+        <section className="page-head no-print">
+          <p className="page-eyebrow">{TAB_META[tab].eyebrow}</p>
+          <h2>{TAB_META[tab].title}</h2>
+          <p>{TAB_META[tab].desc}</p>
+        </section>
+      )}
       {tab === 'overview' && (
         <main>
           <section className="card dash-hero">
-            <div>
+            <div className="hero-copy">
+              <p className="hero-eyebrow">Toán 10 · 11 · 12 — Kết nối tri thức</p>
               <h2>Hôm nay, thầy muốn làm gì?</h2>
-              <p className="muted">Tạo đề theo ma trận, tự động lưu, giao bài cho lớp và xem kết quả ngay trong một nơi.</p>
+              <p className="hero-desc">Tạo đề theo ma trận chuẩn Bộ, giao bài cho lớp, chấm tự động và xem kết quả — tất cả trong một nền tảng duy nhất.</p>
+              <div className="hero-actions">
+                <button className="primary dash-cta" onClick={() => setTab('matrix')}>+ Tạo đề mới</button>
+                <button className="hero-ghost" onClick={() => setTab('bank')}>Mở ngân hàng câu hỏi</button>
+              </div>
+              <div className="hero-stats">
+                <span><strong>{overview?.total ?? '—'}</strong> câu tiếng Việt</span>
+                <span><strong>{englishTotalAll || '—'}</strong> câu tiếng Anh</span>
+                <span><strong>{overview?.theory ?? '—'}</strong> bài lý thuyết</span>
+              </div>
             </div>
-            <button className="primary dash-cta" onClick={() => setTab('matrix')}>+ Tạo đề mới</button>
+            <div className="hero-art" aria-hidden="true">
+              <span className="hero-symbol s1">∑</span>
+              <span className="hero-symbol s2">π</span>
+              <span className="hero-symbol s3">√x</span>
+              <span className="hero-symbol s4">∫</span>
+              <span className="hero-symbol s5">Δ</span>
+            </div>
           </section>
           <section className="card">
             <h3>Bắt đầu nhanh</h3>
@@ -1981,16 +2038,16 @@ export default function App() {
             </div>
           </section>
           <div className="grid dash-groups">
-            <section className="card dash-card"><h3>Đề thi & câu hỏi</h3><div className="filters"><button onClick={() => setTab('matrix')}>Tạo đề theo ma trận</button><button onClick={() => setTab('bank')}>Ngân hàng câu hỏi</button><button onClick={() => setTab('print')}>In đề / đáp án</button><button onClick={() => setTab('admin')}>Quản trị câu hỏi</button></div></section>
-            <section className="card dash-card"><h3>Lớp học & kết quả</h3><div className="filters"><button onClick={() => setTab('assign')}>Giao bài</button><button onClick={() => setTab('take')}>Học sinh làm bài</button><button onClick={() => setTab('results')}>Kết quả</button><button onClick={() => setTab('payment')}>Thanh toán / gia hạn</button>{isAdmin && <button onClick={() => setTab('users')}>Quản lý người dùng</button>}</div></section>
-            <section className="card dash-card"><h3>Dạy học trên lớp</h3><div className="filters"><button onClick={() => setTab('theory')}>Lý thuyết</button><button onClick={() => setTab('english')}>Toán tiếng Anh</button><button onClick={() => setTab('practice')}>Tự luyện</button><button onClick={() => setTab('news')}>Tin giáo dục</button></div></section>
-            <section className="card dash-card"><h3>Trò chơi ôn tập</h3><p className="muted">15 trò chơi có âm thanh, sân khấu 3D/thực tế ảo và kỷ lục cho học sinh.</p><button className="primary" onClick={() => setTab('games')}>Mở trò chơi</button></section>
+            <section className="card dash-card"><span className="dash-icon">▦</span><h3>Đề thi & câu hỏi</h3><p className="muted">Sinh đề tương đương theo ma trận và xuất bản chuẩn form.</p><div className="filters"><button onClick={() => setTab('matrix')}>Tạo đề theo ma trận</button><button onClick={() => setTab('bank')}>Ngân hàng câu hỏi</button><button onClick={() => setTab('print')}>In đề / đáp án</button><button onClick={() => setTab('admin')}>Quản trị câu hỏi</button></div></section>
+            <section className="card dash-card"><span className="dash-icon">◎</span><h3>Lớp học & kết quả</h3><p className="muted">Giao bài bằng mã, chấm tự động và theo dõi tiến bộ.</p><div className="filters"><button onClick={() => setTab('assign')}>Giao bài</button><button onClick={() => setTab('take')}>Học sinh làm bài</button><button onClick={() => setTab('results')}>Kết quả</button><button onClick={() => setTab('payment')}>Thanh toán / gia hạn</button>{isAdmin && <button onClick={() => setTab('users')}>Quản lý người dùng</button>}</div></section>
+            <section className="card dash-card"><span className="dash-icon">✎</span><h3>Dạy học trên lớp</h3><p className="muted">Lý thuyết, Toán tiếng Anh và luyện tập cá nhân hoá.</p><div className="filters"><button onClick={() => setTab('theory')}>Lý thuyết</button><button onClick={() => setTab('english')}>Toán tiếng Anh</button><button onClick={() => setTab('practice')}>Tự luyện</button><button onClick={() => setTab('news')}>Tin giáo dục</button></div></section>
+            <section className="card dash-card"><span className="dash-icon">★</span><h3>Trò chơi ôn tập</h3><p className="muted">15 trò chơi có âm thanh, sân khấu 3D/thực tế ảo và kỷ lục cho học sinh.</p><button className="primary" onClick={() => setTab('games')}>Mở trò chơi</button></section>
           </div>
           <div className="grid stats-grid">
-            <section className="card"><h2>Tổng số câu</h2><p className="big">{overview?.total ?? '—'}</p><p>Lý thuyết: {overview?.theory ?? '—'} bài</p><p>Toán tiếng Anh: <strong>{englishTotalAll || '—'}</strong> câu</p><button className="primary" onClick={() => setTab('english')}>Mở Toán tiếng Anh</button></section>
-            <section className="card"><h2>Theo lớp</h2>{[10, 11, 12].map((g) => <p key={g}>Lớp {g}: <strong>{overview?.byGrade[g] ?? '—'}</strong></p>)}</section>
-            <section className="card"><h2>Theo mức</h2>{LEVELS.map((l) => <p key={l}>{l}: <strong>{overview?.byLevel[l] ?? '—'}</strong></p>)}</section>
-            <section className="card"><h2>Theo phần</h2>{QTYPES.map((q) => <p key={q}>{QTYPE_LABEL[q]}: <strong>{overview?.byType[q] ?? '—'}</strong></p>)}</section>
+            <section className="card metric-card"><h2>Tổng số câu</h2><p className="big">{overview?.total ?? '—'}</p><p>Lý thuyết: {overview?.theory ?? '—'} bài</p><p>Toán tiếng Anh: <strong>{englishTotalAll || '—'}</strong> câu</p><button className="primary" onClick={() => setTab('english')}>Mở Toán tiếng Anh</button></section>
+            <section className="card metric-card"><h2>Theo lớp</h2>{[10, 11, 12].map((g) => <p key={g}>Lớp {g}: <strong>{overview?.byGrade[g] ?? '—'}</strong></p>)}</section>
+            <section className="card metric-card"><h2>Theo mức</h2>{LEVELS.map((l) => <p key={l}>{l}: <strong>{overview?.byLevel[l] ?? '—'}</strong></p>)}</section>
+            <section className="card metric-card"><h2>Theo phần</h2>{QTYPES.map((q) => <p key={q}>{QTYPE_LABEL[q]}: <strong>{overview?.byType[q] ?? '—'}</strong></p>)}</section>
           </div>
         </main>
       )}
@@ -2122,6 +2179,72 @@ export default function App() {
           <h3>Điểm theo phần</h3>
           <div className="filters">{QTYPES.map((q) => <label key={q}>{QTYPE_LABEL[q]}<input type="number" min={0} step="0.25" value={partPoints[q]} onChange={(e) => setPartPoints({ ...partPoints, [q]: Math.max(0, Number(e.target.value)) })} /><span className="muted">{partNeed[q] > 0 ? `${fmtPoints(partPoints[q] / partNeed[q])} đ/câu` : '—'}</span></label>)}</div>
           <p className="muted">Tổng điểm đề: {fmtPoints(QTYPES.reduce((s, q) => s + (partNeed[q] > 0 ? partPoints[q] : 0), 0))} điểm. Điểm mỗi câu bằng điểm của phần chia cho số câu của phần đó. Tổng theo mức phải bằng tổng theo phần; thiếu câu sẽ báo rõ.</p>
+          {(() => {
+            const cap = {} as Record<Level, Record<QType, number>>;
+            for (const l of LEVELS) { cap[l] = {} as Record<QType, number>; for (const q of QTYPES) cap[l][q] = 999; }
+            const cells = standardCells(levelNeed, partNeed, partPoints) ?? buildCellCounts(levelNeed, partNeed, cap);
+            const totalPts = QTYPES.reduce((a, q) => a + (partNeed[q] > 0 ? partPoints[q] : 0), 0);
+            const totalQ = QTYPES.reduce((a, q) => a + partNeed[q], 0);
+            const ptsByLevel = (levels: Level[]) => (cells ? QTYPES.reduce((a, q) => a + (partNeed[q] > 0 ? levels.reduce((b, l) => b + cells[l][q], 0) * (partPoints[q] / partNeed[q]) : 0), 0) : 0);
+            const bhv = [
+              { label: 'Biết (Nhận biết)', pts: ptsByLevel(['NB']), target: 40 },
+              { label: 'Hiểu (Thông hiểu)', pts: ptsByLevel(['TH']), target: 30 },
+              { label: 'Vận dụng', pts: ptsByLevel(['VD', 'VDC']), target: 30 },
+            ];
+            const compSum = Math.max(1, compPct.tuDuy + compPct.giaiQuyet + compPct.moHinh);
+            const compRows = [
+              { key: 'tuDuy' as const, label: 'Tư duy & lập luận toán học' },
+              { key: 'giaiQuyet' as const, label: 'Giải quyết vấn đề toán học' },
+              { key: 'moHinh' as const, label: 'Mô hình hóa toán học' },
+            ];
+            const compCounts = distributeByWeights(totalQ, compRows.map((r) => compPct[r.key]));
+            const scopeList = scopeLessons.filter((l) => scopeMode === 'all' || (scopeMode === 'chapter' ? selectedChapters.includes(baseChapter(l.name)) : selectedLessons.includes(l.name)));
+            const totalPeriods = scopeList.reduce((a, l) => a + (lessonPeriods[l.name] ?? 1), 0);
+            return (
+              <section className="ratio-panel">
+                <h3>Tỉ lệ & phân bổ điểm</h3>
+                <div className="ratio-grid">
+                  <div className="ratio-card">
+                    <h4>Biết – Hiểu – Vận dụng (theo điểm)</h4>
+                    {bhv.map((r) => (
+                      <div className="ratio-row" key={r.label}>
+                        <span>{r.label}</span>
+                        <span className="ratio-bar"><span style={{ width: `${totalPts > 0 ? Math.min(100, (r.pts / totalPts) * 100) : 0}%` }} /></span>
+                        <strong>{totalPts > 0 ? `${((r.pts / totalPts) * 100).toFixed(1).replace('.', ',')}%` : '—'}</strong>
+                        <small>mục tiêu {r.target}%</small>
+                      </div>
+                    ))}
+                    <p className="muted">Chuẩn công văn: 40% Nhận biết – 30% Thông hiểu – 30% Vận dụng.</p>
+                  </div>
+                  <div className="ratio-card">
+                    <h4>Tỉ lệ năng lực toán học (%)</h4>
+                    {compRows.map((r, i) => (
+                      <div className="ratio-row" key={r.key}>
+                        <span>{r.label}</span>
+                        <input type="number" min={0} max={100} value={compPct[r.key]} onChange={(e) => setCompPct({ ...compPct, [r.key]: Math.max(0, Math.min(100, Number(e.target.value))) })} aria-label={`Tỉ lệ ${r.label}`} />
+                        <strong>{compCounts[i]} câu</strong>
+                        <small>{fmtPoints((compPct[r.key] / compSum) * totalPts)} điểm</small>
+                      </div>
+                    ))}
+                    <p className="muted">Tỉ lệ mục tiêu để phân bổ số câu/điểm theo năng lực; hệ thống tự quy về 100%.</p>
+                  </div>
+                  <div className="ratio-card">
+                    <h4>Điểm theo số tiết học</h4>
+                    <p>Tổng số tiết phạm vi: <strong>{totalPeriods || '—'}</strong> · Điểm/tiết: <strong>{totalPeriods > 0 ? fmtPoints(totalPts / totalPeriods) : '—'}</strong> · Câu/tiết: <strong>{totalPeriods > 0 ? (totalQ / totalPeriods).toFixed(2).replace('.', ',') : '—'}</strong></p>
+                    <p className="muted">Ma trận phân bổ câu/điểm cho từng bài theo tỉ lệ số tiết bên dưới (bài nhiều tiết được nhiều điểm hơn).</p>
+                  </div>
+                </div>
+                {scopeList.length > 0 ? (
+                  <div className="period-list">
+                    <strong>Số tiết theo bài</strong>
+                    {scopeList.map((l) => (
+                      <label key={l.name}><span>{lessonTitle(l.name) || l.name}</span><input type="number" min={0} step="0.5" value={lessonPeriods[l.name] ?? 1} onChange={(e) => setLessonPeriods({ ...lessonPeriods, [l.name]: Math.max(0, Number(e.target.value)) })} aria-label={`Số tiết ${l.name}`} /></label>
+                    ))}
+                  </div>
+                ) : <p className="muted">Chọn phạm vi theo chương/bài hoặc chờ tải danh sách bài để nhập số tiết từng bài.</p>}
+              </section>
+            );
+          })()}
           <button className="primary" onClick={() => void generateExam()}>Sinh mã đề</button>
           {examLang === 'en' && <p className="muted">Đề tiếng Anh lấy từ kho Toán tiếng Anh theo đúng ma trận mức × phần; thầy in hoặc xuất file trực tiếp ở mục In đề.</p>}
           {(() => { const cap = {} as Record<Level, Record<QType, number>>; for (const l of LEVELS) { cap[l] = {} as Record<QType, number>; for (const q of QTYPES) cap[l][q] = 999; } const cells = standardCells(levelNeed, partNeed, partPoints) ?? buildCellCounts(levelNeed, partNeed, cap);
@@ -2132,7 +2255,7 @@ export default function App() {
             const lessonsAll = scopeLessons.filter((l) => scopeMode === 'all' || (scopeMode === 'chapter' ? selectedChapters.includes(baseChapter(l.name)) : selectedLessons.includes(l.name)));
             const lessons = lessonsAll.length ? lessonsAll : [{ name: lessonTitle(mLesson) || `Toàn khối ${mGrade}`, count: 0 }];
             const dist: Record<string, number>[] = lessons.map(() => ({}));
-            if (cells) { let seed = 0; for (const q of QTYPES) { for (const g of groups) { const total = g.levels.reduce((a, l) => a + cells[l][q], 0); for (let i = 0; i < total; i++) { const idx = (seed + i) % lessons.length; dist[idx][`${q}|${g.key}`] = (dist[idx][`${q}|${g.key}`] ?? 0) + 1; } seed += 1; } } }
+            if (cells) { const weights = lessons.map((l) => lessonPeriods[l.name] ?? 1); for (const q of QTYPES) { for (const g of groups) { const total = g.levels.reduce((a, l) => a + cells[l][q], 0); const alloc = distributeByWeights(total, weights); alloc.forEach((v, idx) => { if (v > 0) dist[idx][`${q}|${g.key}`] = v; }); } } }
             const ptsOf = (i: number, q: QType, gk: string) => (partNeed[q] > 0 ? (dist[i][`${q}|${gk}`] ?? 0) * (partPoints[q] / partNeed[q]) : 0);
             const totalPts = QTYPES.reduce((a, q) => a + (partNeed[q] > 0 ? partPoints[q] : 0), 0);
             const pct = (v: number) => `${(totalPts > 0 ? (v / totalPts) * 100 : 0).toFixed(1).replace('.', ',')}%`;
@@ -2539,6 +2662,18 @@ export default function App() {
         </main>
       )}
 
+      <footer className="app-footer no-print">
+        <div>
+          <strong>∑ Toán THPT Thầy Đôi</strong>
+          <p>Ngân hàng câu hỏi · Ma trận đề · Lớp học trực tuyến cho Toán 10–12.</p>
+        </div>
+        <div className="footer-links">
+          <button onClick={() => goTab('matrix')}>Tạo đề</button>
+          <button onClick={() => goTab('bank')}>Ngân hàng</button>
+          <button onClick={() => goTab('english')}>Toán tiếng Anh</button>
+          <button onClick={() => goTab('payment')}>Gia hạn</button>
+        </div>
+      </footer>
       <button className="ai-bubble no-print" onClick={() => setAiOpen(!aiOpen)} aria-label="Mở chat AI">💬</button>
       {aiOpen && (
         <section className="ai-panel no-print">
@@ -2553,7 +2688,7 @@ export default function App() {
 
 function QuestionCard({ q, showAnswers }: { q: Question; showAnswers: boolean }) {
   return (
-    <article className="card">
+    <article className="card question-card">
       <p className="meta">ID {q.id} · Lớp {q.grade} · {q.chapter} · Bài: {q.lesson || '—'} · Dạng: {q.dang} · {q.level} · {QTYPE_LABEL[q.qtype]} · {q.points} điểm</p>
       <div className="content"><MathText text={q.content} /></div>
       {q.image_url && <img className="figure" src={q.image_url} alt="Hình minh họa" />}
