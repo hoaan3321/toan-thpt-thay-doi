@@ -1709,15 +1709,20 @@ export default function App() {
 
   async function downloadExamBundle() {
     if (!generated.length) { setMatrixMsg('Hãy sinh mã đề trước khi tải bộ đề.'); return; }
-    const files = [
-      { name: 'de-toan.docx', blob: examDocxBlob('de') },
-      { name: 'ma-tran-de.docx', blob: matrixDocxBlob() },
-      { name: 'bang-dac-ta.docx', blob: specDocxBlob() },
-    ];
-    const entries: { name: string; data: Uint8Array }[] = [];
-    for (const f of files) entries.push({ name: f.name, data: new Uint8Array(await f.blob.arrayBuffer()) });
-    downloadBlob('bo-de-ma-tran-dac-ta.zip', zipStore(entries));
-    setMatrixMsg('Đã tải bộ đề gồm đề, ma trận và bảng đặc tả.');
+    try {
+      setMatrixMsg('Đang tạo bộ đề gồm đề, ma trận và bảng đặc tả...');
+      const files = [
+        { name: 'de-toan.docx', blob: examDocxBlob('de') },
+        { name: 'ma-tran-de.docx', blob: matrixDocxBlob() },
+        { name: 'bang-dac-ta.docx', blob: specDocxBlob() },
+      ];
+      const entries: { name: string; data: Uint8Array }[] = [];
+      for (const f of files) entries.push({ name: f.name, data: new Uint8Array(await f.blob.arrayBuffer()) });
+      downloadBlob('bo-de-ma-tran-dac-ta.zip', zipStore(entries));
+      setMatrixMsg('Đã tải bộ đề gồm đề, ma trận và bảng đặc tả.');
+    } catch (e) {
+      setMatrixMsg(`Chưa tải được bộ đề: ${e instanceof Error ? e.message : String(e)}`);
+    }
   }
 
   function exportLatex(kind: 'de' | 'dapan' = 'de') {
