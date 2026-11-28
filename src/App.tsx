@@ -133,7 +133,28 @@ const NEWS_ITEMS = [
   { title: 'Thông tư về SGK điện tử và dạy thêm, học thêm', date: '2026', tag: 'Trung học', desc: 'Tin giáo dục trung học: quy định chuyển thể SGK bản in sang SGK điện tử; sửa đổi quy định về dạy thêm, học thêm.', url: 'https://moet.gov.vn/chuyen-de-giao-duc-va-dao-tao/giao-duc-trung-hoc?menuId=Article.DraftText&categoryId=15165247' },
 ];
 
+const SCHOOL_LEVELS = [
+  { key: 'primary', label: 'Tiểu học', grades: [1, 2, 3, 4, 5] },
+  { key: 'middle', label: 'THCS', grades: [6, 7, 8, 9] },
+  { key: 'high', label: 'THPT', grades: [10, 11, 12] },
+  { key: 'exam', label: 'Ôn thi đại học', grades: [13] },
+] as const;
+
+function gradeLabel(g: number): string {
+  return g === 13 ? 'Ôn thi đại học' : `Lớp ${g}`;
+}
+
 const ENGLISH_LESSONS: Record<number, string[]> = {
+  1: ["Các số đến 10", "Phép cộng, phép trừ trong phạm vi 10", "Các số đến 20", "Phép cộng, phép trừ trong phạm vi 20", "Các số đến 100", "Phép cộng, phép trừ trong phạm vi 100", "Độ dài và đo độ dài", "Thời gian", "Hình học phẳng cơ bản"],
+  2: ["Phép cộng, phép trừ trong phạm vi 100", "Phép nhân, phép chia", "Các số đến 1000", "Phép cộng, phép trừ trong phạm vi 1000", "Đo lường", "Hình học và đo lường", "Thống kê cơ bản"],
+  3: ["Các số đến 100000", "Phép nhân, phép chia trong phạm vi 100000", "Phân số", "Đo lường", "Hình học phẳng", "Thống kê và xác suất"],
+  4: ["Số tự nhiên", "Phân số", "Phép tính với phân số", "Góc và đo góc", "Hình học phẳng", "Thống kê và xác suất"],
+  5: ["Số thập phân", "Phép tính với số thập phân", "Tỉ số và tỉ lệ", "Diện tích và thể tích", "Chuyển động đều", "Thống kê và xác suất"],
+  6: ["Tập hợp số tự nhiên", "Tính chia hết", "Số nguyên", "Phân số", "Số thập phân", "Hình học phẳng", "Thống kê và xác suất"],
+  7: ["Số hữu tỉ", "Số thực", "Tỉ lệ thức", "Biểu thức đại số", "Đường thẳng song song", "Tam giác", "Thống kê và xác suất"],
+  8: ["Đa thức", "Phân thức đại số", "Phương trình bậc nhất", "Hàm số bậc nhất", "Định lí Pythagore", "Tứ giác", "Xác suất"],
+  9: ["Căn bậc hai", "Hàm số bậc hai", "Phương trình bậc hai", "Hệ phương trình", "Đường tròn", "Hình học không gian", "Thống kê và xác suất"],
+  13: ["Hàm số và đồ thị", "Đạo hàm và ứng dụng", "Nguyên hàm, tích phân", "Mũ và lôgarit", "Hình học không gian Oxyz", "Xác suất và tổ hợp", "Dãy số, cấp số", "Hình học không gian cổ điển"],
   10: ['Mệnh đề','Tập hợp','Các phép toán trên tập hợp','Bất phương trình bậc nhất hai ẩn','Hệ bất phương trình bậc nhất hai ẩn','Giá trị lượng giác của một góc từ 0° đến 180°','Hệ thức lượng trong tam giác','Các khái niệm mở đầu','Tổng và hiệu của hai vectơ','Tích của một vectơ với một số','Vectơ trong mặt phẳng tọa độ','Tích vô hướng của hai vectơ','Số gần đúng và sai số','Các số đặc trưng đo xu thế trung tâm','Các số đặc trưng đo độ phân tán','Hàm số','Hàm số bậc hai','Dấu của tam thức bậc hai','Phương trình quy về phương trình bậc hai','Phương trình đường thẳng','Vị trí tương đối giữa hai đường thẳng. Góc và khoảng cách','Đường tròn trong mặt phẳng tọa độ','Ba đường conic','Quy tắc đếm','Hoán vị, chỉnh hợp và tổ hợp','Nhị thức Newton','Biến cố và định nghĩa cổ điển của xác suất','Thực hành tính xác suất theo định nghĩa cổ điển','Hệ phương trình bậc nhất ba ẩn','Phương pháp quy nạp toán học. Nhị thức Newton','Ba đường conic và ứng dụng'],
   11: ['Giá trị lượng giác của góc lượng giác','Công thức lượng giác','Hàm số lượng giác','Phương trình lượng giác','Dãy số','Cấp số cộng','Cấp số nhân','Mẫu số liệu ghép nhóm','Các số đặc trưng đo xu thế trung tâm cho mẫu số liệu ghép nhóm','Đường thẳng và mặt phẳng trong không gian','Hai đường thẳng song song','Đường thẳng song song với mặt phẳng','Hai mặt phẳng song song','Phép chiếu song song','Giới hạn của dãy số','Giới hạn của hàm số','Hàm số liên tục','Lũy thừa với số mũ thực','Lôgarit','Hàm số mũ và hàm số lôgarit','Phương trình, bất phương trình mũ và lôgarit','Hai đường thẳng vuông góc','Đường thẳng vuông góc với mặt phẳng','Phép chiếu vuông góc. Góc giữa đường thẳng và mặt phẳng','Hai mặt phẳng vuông góc','Khoảng cách','Thể tích','Biến cố hợp, biến cố giao, biến cố độc lập','Công thức cộng xác suất','Công thức nhân xác suất cho hai biến cố độc lập','Định nghĩa và ý nghĩa của đạo hàm','Các quy tắc tính đạo hàm','Đạo hàm cấp hai','Phép biến hình trong mặt phẳng','Làm quen với một vài khái niệm của lí thuyết đồ thị','Một số yếu tố vẽ kĩ thuật'],
   12: ['Tính đơn điệu và cực trị của hàm số','Giá trị lớn nhất và giá trị nhỏ nhất của hàm số','Đường tiệm cận của đồ thị hàm số','Khảo sát sự biến thiên và vẽ đồ thị của hàm số','Ứng dụng đạo hàm để giải quyết một số vấn đề liên quan đến thực tiễn','Vectơ trong không gian','Hệ trục tọa độ trong không gian','Biểu thức toạ độ của các phép toán vectơ','Khoảng biến thiên và khoảng tứ phân vị','Phương sai và độ lệch chuẩn','Nguyên hàm','Tích phân','Ứng dụng hình học của tích phân','Phương trình mặt phẳng','Phương trình đường thẳng trong không gian','Phương trình mặt cầu','Công thức tính góc trong không gian','Xác suất có điều kiện','Công thức xác suất toàn phần và công thức Bayes'],
@@ -615,6 +636,8 @@ export default function App() {
 
   const [overview, setOverview] = useState<{ total: number; theory: number; byGrade: Record<string, number>; byLevel: Record<string, number>; byType: Record<string, number> } | null>(null);
 
+  const [schoolLevel, setSchoolLevel] = useState<string>('high');
+  const levelGrades = (SCHOOL_LEVELS.find((l) => l.key === schoolLevel) ?? SCHOOL_LEVELS[2]).grades as unknown as number[];
   const [grade, setGrade] = useState(12);
   const [chapter, setChapter] = useState('');
   const [dang, setDang] = useState('');
@@ -631,7 +654,7 @@ export default function App() {
   const [theoryGrade, setTheoryGrade] = useState(12);
   const [theory, setTheory] = useState<TheoryNote[]>([]);
 
-  const [englishGrade, setEnglishGrade] = useState<'all' | 10 | 11 | 12>('all');
+  const [englishGrade, setEnglishGrade] = useState<'all' | number>('all');
   const [englishLevel, setEnglishLevel] = useState('');
   const [englishLesson, setEnglishLesson] = useState('');
   const [englishDang, setEnglishDang] = useState('');
@@ -783,7 +806,7 @@ export default function App() {
     return groups;
   }, [questions]);
 
-  const englishLessons = englishGrade === 'all' ? [...ENGLISH_LESSONS[10], ...ENGLISH_LESSONS[11], ...ENGLISH_LESSONS[12]] : ENGLISH_LESSONS[englishGrade];
+  const englishLessons = englishGrade === 'all' ? levelGrades.flatMap((g) => ENGLISH_LESSONS[g] ?? []) : (ENGLISH_LESSONS[englishGrade] ?? []);
   const englishParams = useMemo(() => {
     const p = eqParams({ grade: englishGrade === 'all' ? undefined : englishGrade, level: englishLevel || undefined, lesson_vi: englishLesson || undefined, dang_vi: englishDang || undefined, interesting: englishOnlyInteresting ? 'true' : undefined });
     if (englishSearch.trim()) {
@@ -1126,7 +1149,7 @@ export default function App() {
       const byGrade: Record<string, number> = {};
       const byLevel: Record<string, number> = {};
       const byType: Record<string, number> = {};
-      for (const g of [10, 11, 12]) byGrade[g] = await supabaseCount('questions', eqParams({ grade: g }));
+      for (const g of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]) byGrade[g] = await supabaseCount('questions', eqParams({ grade: g }));
       for (const l of LEVELS) byLevel[l] = await supabaseCount('questions', eqParams({ level: l }));
       for (const q of QTYPES) byType[q] = await supabaseCount('questions', eqParams({ qtype: q }));
       setOverview({ total, theory: theoryTotal, byGrade, byLevel, byType });
@@ -1166,6 +1189,64 @@ export default function App() {
   }
 
   const LESSON_EN: Record<string, string> = {
+  "Các số đến 10": "Numbers to 10",
+  "Phép cộng, phép trừ trong phạm vi 10": "Addition and subtraction within 10",
+  "Các số đến 20": "Numbers to 20",
+  "Phép cộng, phép trừ trong phạm vi 20": "Addition and subtraction within 20",
+  "Các số đến 100": "Numbers to 100",
+  "Phép cộng, phép trừ trong phạm vi 100": "Addition and subtraction within 100",
+  "Độ dài và đo độ dài": "Length and measuring length",
+  "Thời gian": "Time",
+  "Hình học phẳng cơ bản": "Basic plane shapes",
+  "Phép nhân, phép chia": "Multiplication and division",
+  "Các số đến 1000": "Numbers to 1000",
+  "Phép cộng, phép trừ trong phạm vi 1000": "Addition and subtraction within 1000",
+  "Đo lường": "Measurement",
+  "Hình học và đo lường": "Geometry and measurement",
+  "Thống kê cơ bản": "Basic statistics",
+  "Các số đến 100000": "Numbers to 100000",
+  "Phép nhân, phép chia trong phạm vi 100000": "Multiplication and division within 100000",
+  "Phân số": "Fractions",
+  "Hình học phẳng": "Plane geometry",
+  "Thống kê và xác suất": "Statistics and probability",
+  "Số tự nhiên": "Natural numbers",
+  "Phép tính với phân số": "Operations with fractions",
+  "Góc và đo góc": "Angles and measuring angles",
+  "Số thập phân": "Decimals",
+  "Phép tính với số thập phân": "Operations with decimals",
+  "Tỉ số và tỉ lệ": "Ratio and proportion",
+  "Diện tích và thể tích": "Area and volume",
+  "Chuyển động đều": "Uniform motion",
+  "Tập hợp số tự nhiên": "Sets of natural numbers",
+  "Tính chia hết": "Divisibility",
+  "Số nguyên": "Integers",
+  "Số hữu tỉ": "Rational numbers",
+  "Số thực": "Real numbers",
+  "Tỉ lệ thức": "Proportions",
+  "Biểu thức đại số": "Algebraic expressions",
+  "Đường thẳng song song": "Parallel lines",
+  "Tam giác": "Triangles",
+  "Đa thức": "Polynomials",
+  "Phân thức đại số": "Algebraic fractions",
+  "Phương trình bậc nhất": "Linear equations",
+  "Hàm số bậc nhất": "Linear functions",
+  "Định lí Pythagore": "Pythagorean theorem",
+  "Tứ giác": "Quadrilaterals",
+  "Xác suất": "Probability",
+  "Căn bậc hai": "Square roots",
+  "Hàm số bậc hai": "Quadratic functions",
+  "Phương trình bậc hai": "Quadratic equations",
+  "Hệ phương trình": "Systems of equations",
+  "Đường tròn": "Circles",
+  "Hình học không gian": "Solid geometry",
+  "Hàm số và đồ thị": "Functions and graphs",
+  "Đạo hàm và ứng dụng": "Derivatives and applications",
+  "Nguyên hàm, tích phân": "Antiderivatives and integrals",
+  "Mũ và lôgarit": "Exponents and logarithms",
+  "Hình học không gian Oxyz": "Coordinate geometry in space",
+  "Xác suất và tổ hợp": "Probability and combinatorics",
+  "Dãy số, cấp số": "Sequences and progressions",
+  "Hình học không gian cổ điển": "Classical solid geometry",
   "Ba đường conic": "Conic sections",
   "Ba đường conic và ứng dụng": "Conic sections and applications",
   "Bất phương trình bậc nhất hai ẩn": "Linear inequalities",
@@ -1204,7 +1285,6 @@ export default function App() {
   "Hai mặt phẳng song song": "Parallel planes",
   "Hai mặt phẳng vuông góc": "Perpendicular planes",
   "Hàm số": "Functions",
-  "Hàm số bậc hai": "Quadratic functions",
   "Hàm số liên tục": "Continuous functions",
   "Hàm số lượng giác": "Trigonometric functions",
   "Hàm số mũ và hàm số lôgarit": "Exponential and logarithmic functions",
@@ -1432,7 +1512,7 @@ function baseChapter(chapter: string): string {
     if (!session) { if (!auto) { setError('Hãy đăng nhập giáo viên trước khi lưu đề.'); setTab('assign'); } return null; }
     if (!canTeach) { if (!auto) setError('Tài khoản giáo viên cần full tính năng để lưu đề.'); return null; }
     const examRows = await supabaseInsert<ExamRecord[]>('exams', {
-      title: examTitle.trim() || (en ? `Grade ${mGrade} Math Exam` : `Đề Toán lớp ${mGrade}`),
+      title: examTitle.trim() || (en ? (mGrade === 13 ? 'University Entrance Math Exam' : `Grade ${mGrade} Math Exam`) : (mGrade === 13 ? 'Đề Ôn thi đại học' : `Đề Toán lớp ${mGrade}`)),
       grade: mGrade,
       scope_chapter: scopeMode === 'chapter' ? selectedChapters.join('; ') : scopeMode === 'lesson' ? [...new Set(selectedLessons.map((l) => baseChapter(l)))].join('; ') : '',
       scope_lesson: scopeMode === 'lesson' ? selectedLessons.join('; ') : scopeMode === 'chapter' ? scopeLessons.filter((l) => selectedChapters.includes(baseChapter(l.name)) && !excludedLessons.includes(l.name)).map((l) => l.name).join('; ') : '',
@@ -2193,11 +2273,16 @@ function baseChapter(chapter: string): string {
       {error && <section className="notice danger no-print">{error} <button onClick={() => setError('')}>Đóng</button></section>}
       {loading && <p className="muted no-print">Đang tải…</p>}
       {tab !== 'overview' && (
+        <>
         <section className="page-head no-print">
           <p className="page-eyebrow">{TAB_META[tab].eyebrow}</p>
           <h2>{TAB_META[tab].title}</h2>
           <p>{TAB_META[tab].desc}</p>
         </section>
+        <div className="level-tabs no-print" role="tablist" aria-label="Cấp học">
+          {SCHOOL_LEVELS.map((l) => <button key={l.key} role="tab" aria-selected={schoolLevel === l.key} className={schoolLevel === l.key ? 'active' : ''} onClick={() => { setSchoolLevel(l.key); const g0 = l.grades[0]; setGrade(g0); setMGrade(g0); setPracticeGrade(String(g0)); setGameGrade(g0); setTheoryGrade(g0); setEnglishGrade('all'); setBankLesson(''); setPage(0); setMChapter(''); setMLesson(''); setSelectedChapters([]); setSelectedLessons([]); setExcludedLessons([]); }}>{l.label}</button>)}
+        </div>
+        </>
       )}
       {tab === 'overview' && (
         <main>
@@ -2264,7 +2349,7 @@ function baseChapter(chapter: string): string {
           </div>
           <div className="grid stats-grid">
             <section className="card metric-card"><h2>Tổng số câu</h2><p className="big">{overview?.total ?? '—'}</p><p>Lý thuyết: {overview?.theory ?? '—'} bài</p><p>Toán tiếng Anh: <strong>{englishTotalAll || '—'}</strong> câu</p><button className="primary" onClick={() => setTab('english')}>Mở Toán tiếng Anh</button></section>
-            <section className="card metric-card"><h2>Theo lớp</h2>{[10, 11, 12].map((g) => <p key={g}>Lớp {g}: <strong>{overview?.byGrade[g] ?? '—'}</strong></p>)}</section>
+            <section className="card metric-card"><h2>Theo lớp</h2>{levelGrades.map((g) => <p key={g}>{gradeLabel(g)}: <strong>{overview?.byGrade[g] ?? '—'}</strong></p>)}</section>
             <section className="card metric-card"><h2>Theo mức</h2>{LEVELS.map((l) => <p key={l}>{l}: <strong>{overview?.byLevel[l] ?? '—'}</strong></p>)}</section>
             <section className="card metric-card"><h2>Theo phần</h2>{QTYPES.map((q) => <p key={q}>{QTYPE_LABEL[q]}: <strong>{overview?.byType[q] ?? '—'}</strong></p>)}</section>
           </div>
@@ -2274,7 +2359,7 @@ function baseChapter(chapter: string): string {
       {tab === 'bank' && (
         <main>
           <section className="filters no-print">
-            <label>Lớp<select value={grade} onChange={(e) => { setGrade(Number(e.target.value)); setBankLesson(''); setPage(0); }}><option>10</option><option>11</option><option>12</option></select></label>
+            <label>Lớp<select value={grade} onChange={(e) => { setGrade(Number(e.target.value)); setBankLesson(''); setPage(0); }}>{levelGrades.map((g) => <option key={g} value={g}>{gradeLabel(g)}</option>)}</select></label>
             <label>Bài<select value={bankLesson} onChange={(e) => { setBankLesson(e.target.value); setPage(0); }}><option value="">Tất cả bài</option>{ENGLISH_LESSONS[grade].map((l) => <option key={l} value={l}>{l}</option>)}</select></label>
             <label>Chương<input value={chapter} onChange={(e) => setChapter(e.target.value)} placeholder="Tên chương" /></label>
             <label>Dạng<input value={dang} onChange={(e) => setDang(e.target.value)} placeholder="Dạng toán" /></label>
@@ -2302,7 +2387,7 @@ function baseChapter(chapter: string): string {
       {tab === 'theory' && (
         <main>
           <div className="filters no-print">
-            {[10, 11, 12].map((g) => <button key={g} className={theoryGrade === g ? 'active' : ''} onClick={() => setTheoryGrade(g)}>Lớp {g}</button>)}
+            {levelGrades.map((g) => <button key={g} className={theoryGrade === g ? 'active' : ''} onClick={() => setTheoryGrade(g)}>{gradeLabel(g)}</button>)}
           </div>
           {theory.map((n) => (
             <article className="card" key={n.id}>
@@ -2329,7 +2414,7 @@ function baseChapter(chapter: string): string {
             </div>
           </section>
           <section className="filters no-print">
-            <label>Lớp<select value={String(englishGrade)} onChange={(e) => { setEnglishGrade(e.target.value === 'all' ? 'all' : Number(e.target.value) as 10 | 11 | 12); setEnglishLesson(''); setEnglishDang(''); setEnglishPage(0); }}><option value="all">Tất cả</option><option value="10">Lớp 10</option><option value="11">Lớp 11</option><option value="12">Lớp 12</option></select></label>
+            <label>Lớp<select value={String(englishGrade)} onChange={(e) => { setEnglishGrade(e.target.value === 'all' ? 'all' : Number(e.target.value)); setEnglishLesson(''); setEnglishDang(''); setEnglishPage(0); }}><option value="all">Tất cả</option>{levelGrades.map((g) => <option key={g} value={g}>{gradeLabel(g)}</option>)}</select></label>
             <label>Bài<select value={englishLesson} onChange={(e) => { setEnglishLesson(e.target.value); setEnglishDang(''); setEnglishPage(0); }}><option value="">Tất cả</option>{englishLessons.map((t) => <option key={t}>{t}</option>)}</select></label>
             <label>Dạng<select value={englishDang} onChange={(e) => { setEnglishDang(e.target.value); setEnglishPage(0); }}><option value="">{englishLesson ? 'Tất cả' : 'Chọn bài trước'}</option>{englishDangOptions.map((t) => <option key={t}>{t}</option>)}</select></label>
             <label>Mức độ<select value={englishLevel} onChange={(e) => { setEnglishLevel(e.target.value); setEnglishPage(0); }}><option value="">Tất cả</option><option>NB</option><option>TH</option><option>VD</option><option>VDC</option></select></label>
@@ -2385,7 +2470,7 @@ function baseChapter(chapter: string): string {
           <h2>Tạo đề theo ma trận</h2>
           <div className="filters">
             <label>Ngôn ngữ đề<select value={examLang} onChange={(e) => { const v = e.target.value as 'vi' | 'en'; setExamLang(v); if (v === 'en' && (examTitle === 'Đề Toán THPT' || /^Đề Toán lớp/.test(examTitle))) setExamTitle(`Grade ${mGrade} Math Exam`); if (v === 'vi' && /^Grade \d+ Math Exam$/.test(examTitle)) setExamTitle('Đề Toán THPT'); }}><option value="vi">Tiếng Việt</option><option value="en">Tiếng Anh</option></select></label>
-            <label>Lớp<select value={mGrade} onChange={(e) => { setMGrade(Number(e.target.value)); setMChapter(''); setMLesson(''); setSelectedChapters([]); setSelectedLessons([]); }}><option>10</option><option>11</option><option>12</option></select></label>
+            <label>Lớp<select value={mGrade} onChange={(e) => { setMGrade(Number(e.target.value)); setMChapter(''); setMLesson(''); setSelectedChapters([]); setSelectedLessons([]); setExcludedLessons([]); }}>{levelGrades.map((g) => <option key={g} value={g}>{gradeLabel(g)}</option>)}</select></label>
             <label>Phạm vi<select value={scopeMode} onChange={(e) => setScopeMode(e.target.value as 'all' | 'chapter' | 'lesson')}><option value="all">Toàn khối</option><option value="chapter">Theo chương</option><option value="lesson">Theo bài</option></select></label>
             {scopeMode === 'chapter' && <div className="scope-checks"><strong>Tích chương, rồi tích/bỏ từng bài trong chương ({scopeLessons.filter((l) => selectedChapters.includes(baseChapter(l.name)) && !excludedLessons.includes(l.name)).length} bài đang chọn)</strong><div className="filters"><button type="button" onClick={() => { setSelectedChapters(scopeChapters.map((c) => c.name)); setExcludedLessons([]); }}>Chọn tất cả chương và bài</button><button type="button" onClick={() => { setSelectedChapters([]); setExcludedLessons([]); }}>Bỏ chọn</button></div>{scopeChapters.length === 0 && <span className="muted">Đang tải danh sách chương…</span>}{scopeChapters.map((c) => { const chapterLessons = scopeLessons.filter((l) => baseChapter(l.name) === c.name); const chapterOn = selectedChapters.includes(c.name); return (<div key={c.name} className="scope-chapter"><label><input type="checkbox" checked={chapterOn} onChange={(e) => setSelectedChapters(e.target.checked ? [...selectedChapters, c.name] : selectedChapters.filter((x) => x !== c.name))} /> <strong>{c.name}</strong> ({c.count} câu)</label>{chapterOn && <div className="scope-lessons">{chapterLessons.map((l) => <label key={l.name}><input type="checkbox" checked={!excludedLessons.includes(l.name)} onChange={(e) => setExcludedLessons(e.target.checked ? excludedLessons.filter((x) => x !== l.name) : [...excludedLessons, l.name])} /> {lessonTitle(l.name) || l.name} ({l.count} câu)</label>)}</div>}</div>); })}</div>}
             {scopeMode === 'lesson' && <div className="scope-checks"><strong>Tích nhiều bài cần kiểm tra ({selectedLessons.length}/{scopeLessons.length})</strong><div className="filters"><button type="button" onClick={() => setSelectedLessons(scopeLessons.map((l) => l.name))}>Chọn tất cả bài</button><button type="button" onClick={() => setSelectedLessons([])}>Bỏ chọn</button></div>{scopeLessons.length === 0 && <span className="muted">Đang tải danh sách bài…</span>}{scopeLessons.map((l) => <label key={l.name}><input type="checkbox" checked={selectedLessons.includes(l.name)} onChange={(e) => setSelectedLessons(e.target.checked ? [...selectedLessons, l.name] : selectedLessons.filter((x) => x !== l.name))} /> {l.name} ({l.count} câu)</label>)}</div>}
@@ -2678,7 +2763,7 @@ function baseChapter(chapter: string): string {
           {generated.length === 0 && <p className="muted">Chưa có mã đề. Hãy vào mục Tạo đề để sinh mã.</p>}
           {generated.map((code) => (
             <section className="exam" key={code.code}>
-              <h2>{en ? `Grade ${mGrade} Math Exam — Code ${String(code.code).padStart(2, '0')}` : `Đề Toán lớp ${mGrade} — Mã đề ${String(code.code).padStart(2, '0')}`}</h2>
+              <h2>{en ? `${mGrade === 13 ? 'University Entrance Math Exam' : `Grade ${mGrade} Math Exam`} — Code ${String(code.code).padStart(2, '0')}` : `${mGrade === 13 ? 'Đề Ôn thi đại học' : `Đề Toán lớp ${mGrade}`} — Mã đề ${String(code.code).padStart(2, '0')}`}</h2>
               <p className="meta">{en ? `Time: ${duration} minutes · Total score: ${fmtPts(code.rawPoints, true)} points · ${examDateTime(true)}` : `Thời gian: ${duration} phút · Tổng điểm: ${fmtPoints(code.rawPoints)} điểm · ${examDateTime()}`}</p>
               {QTYPES.map((qt) => {
                 const qs = code.questions.filter((q) => q.qtype === qt);
@@ -2785,7 +2870,7 @@ function baseChapter(chapter: string): string {
             <div className="filters">
               <button className={practiceMode === 'vi' ? 'primary' : ''} onClick={() => setPracticeMode('vi')}>Toán tiếng Việt</button>
               <button className={practiceMode === 'en' ? 'primary' : ''} onClick={() => setPracticeMode('en')}>Toán tiếng Anh</button>
-              <label>Lớp<select value={practiceGrade} onChange={(e) => setPracticeGrade(e.target.value)}><option>10</option><option>11</option><option>12</option></select></label>
+              <label>Lớp<select value={practiceGrade} onChange={(e) => setPracticeGrade(e.target.value)}>{levelGrades.map((g) => <option key={g} value={g}>{gradeLabel(g)}</option>)}</select></label>
               <label>Bài<select value={practiceLesson} onChange={(e) => setPracticeLesson(e.target.value)}><option value="">Tất cả bài</option>{ENGLISH_LESSONS[Number(practiceGrade)].map((l) => <option key={l} value={l}>{l}</option>)}</select></label>
               <label>Mức độ<select value={practiceLevel} onChange={(e) => setPracticeLevel(e.target.value)}><option value="">Tất cả</option>{LEVELS.map((l) => <option key={l} value={l}>{l}</option>)}</select></label>
               <label>Số câu<select value={practiceCount} onChange={(e) => setPracticeCount(Number(e.target.value))}><option value={10}>10 câu</option><option value={20}>20 câu</option><option value={30}>30 câu</option></select></label>
@@ -2820,7 +2905,7 @@ function baseChapter(chapter: string): string {
           <p className="muted">15 trò chơi 3D/thực tế ảo biến tấu riêng của Toán Thầy Đôi - Love Math, có âm thanh, sân khấu nhập vai và câu hỏi lấy từ ngân hàng theo lớp, bài và mức độ.</p>
           <div className="filters">
             <label>Ngôn ngữ<select value={gameLang} onChange={(e) => setGameLang(e.target.value as 'vi' | 'en')}><option value="vi">Tiếng Việt</option><option value="en">Tiếng Anh</option></select></label>
-            <label>Lớp<select value={gameGrade} onChange={(e) => setGameGrade(Number(e.target.value))}><option>10</option><option>11</option><option>12</option></select></label>
+            <label>Lớp<select value={gameGrade} onChange={(e) => setGameGrade(Number(e.target.value))}>{levelGrades.map((g) => <option key={g} value={g}>{gradeLabel(g)}</option>)}</select></label>
             <label>Mức độ<select value={gameLevel} onChange={(e) => setGameLevel(e.target.value)}><option value="">Tất cả</option>{LEVELS.map((l) => <option key={l} value={l}>{l}</option>)}</select></label>
             <label>Bài<select value={gameLesson} onChange={(e) => setGameLesson(e.target.value)}><option value="">Tất cả bài</option>{ENGLISH_LESSONS[gameGrade].map((l) => <option key={l} value={l}>{l}</option>)}</select></label>
             <button onClick={() => setSoundOn(!soundOn)}>{soundOn ? '🔊 Âm thanh: Bật' : '🔇 Âm thanh: Tắt'}</button>

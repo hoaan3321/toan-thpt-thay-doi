@@ -392,3 +392,7 @@ td input { width: 90px; min-height: 36px; padding: 6px 8px; }
   .card { box-shadow: none; }
   .options-grid > span { background: none; border: 0; padding: 0; }
 }
+
+.level-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 14px; }
+.level-tabs button { padding: 9px 16px; border-radius: 999px; border: 1px solid var(--border, #d7dce8); background: var(--surface, #fff); font-weight: 600; cursor: pointer; }
+.level-tabs button.active { background: linear-gradient(135deg, #4f46e5, #06b6d4); color: #fff; border-color: transparent; }
