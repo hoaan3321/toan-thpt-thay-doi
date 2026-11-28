@@ -53,7 +53,7 @@ export default async function handler(req, res) {
     headers: { apikey: cfg.key, Authorization: `Bearer ${cfg.key}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ p_transfer_code: transferCode, p_provider_ref: providerRef, p_provider: provider, p_amount: amount }),
   });
-  const data = await rpc.json().catch(() => ({}));
-  if (!rpc.ok) { res.status(502).json({ error: 'Supabase RPC failed', detail: data }); return; }
-  res.status(200).json({ success: true, matched: Boolean(data?.ok), ...data });
+  const rpcData = await rpc.json().catch(() => ({}));
+  if (!rpc.ok) { res.status(502).json({ success: false, error: 'Supabase RPC failed', detail: rpcData }); return; }
+  res.status(200).json({ success: true, matched: Boolean(rpcData?.ok), ...rpcData });
 }
