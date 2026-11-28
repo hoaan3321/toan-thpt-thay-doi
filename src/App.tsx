@@ -621,6 +621,8 @@ export default function App() {
   const [scopeMode, setScopeMode] = useState<'all' | 'chapter' | 'lesson'>('all');
   const [mChapter, setMChapter] = useState('');
   const [mLesson, setMLesson] = useState('');
+  const [selectedChapters, setSelectedChapters] = useState<string[]>([]);
+  const [selectedLessons, setSelectedLessons] = useState<string[]>([]);
   const [scopeChapters, setScopeChapters] = useState<{ name: string; count: number }[]>([]);
   const [scopeLessons, setScopeLessons] = useState<{ name: string; base: string; count: number }[]>([]);
   const [numCodes, setNumCodes] = useState(4);
@@ -1238,6 +1240,8 @@ export default function App() {
       setScopeLessons(lessons);
       if (!mChapter && chapters[0]) setMChapter(chapters[0].name);
       if (!mLesson && lessons[0]) setMLesson(lessons[0].name);
+      setSelectedChapters((prev) => prev.length ? prev.filter((c) => chapters.some((x) => x.name === c)) : (chapters[0] ? [chapters[0].name] : []));
+      setSelectedLessons((prev) => prev.length ? prev.filter((l) => lessons.some((x) => x.name === l)) : (lessons[0] ? [lessons[0].name] : []));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -1255,13 +1259,11 @@ export default function App() {
         if (rows.length < 1000) break;
       }
       let pool = erows;
-      if (scopeMode === 'lesson') pool = pool.filter((q) => q.lesson_vi === lessonTitle(mLesson));
-      if (scopeMode === 'chapter') { const titles = new Set(scopeLessons.filter((l) => baseChapter(l.name) === mChapter).map((l) => lessonTitle(l.name))); pool = pool.filter((q) => titles.has(q.lesson_vi)); }
+      if (scopeMode === 'lesson') { const titles = new Set(selectedLessons.map((l) => lessonTitle(l))); pool = pool.filter((q) => titles.has(q.lesson_vi)); }
+      if (scopeMode === 'chapter') { const titles = new Set(scopeLessons.filter((l) => selectedChapters.includes(baseChapter(l.name))).map((l) => lessonTitle(l.name))); pool = pool.filter((q) => titles.has(q.lesson_vi)); }
       return pool.map((q) => ({ id: 900000000 + q.id, grade: q.grade, chapter: q.lesson_vi, lesson: q.lesson_vi, dang: q.dang, level: q.level as Level, qtype: q.qtype, content: q.problem, options: q.options ?? [], correct: q.answer, explanation: q.solution_en, points: 0 }));
     }
     const p = eqParams({ grade: mGrade });
-    if (scopeMode === 'lesson') p.set('lesson', `eq.${lessonTitle(mLesson)}`);
-    if (scopeMode === 'chapter') p.set('chapter', `like.${mChapter}*`);
     p.set('select', '*');
     p.set('order', 'id.asc');
     const all: Question[] = [];
@@ -1274,11 +1276,9 @@ export default function App() {
       all.push(...rows);
       if (rows.length < limit) break;
     }
-    if (scopeMode === 'chapter') return all.filter((q) => baseChapter(q.chapter) === mChapter);
+    if (scopeMode === 'chapter') return all.filter((q) => selectedChapters.includes(baseChapter(q.chapter)));
     if (scopeMode === 'lesson') {
-      const base = baseChapter(mLesson);
-      const title = lessonTitle(mLesson);
-      return all.filter((q) => baseChapter(q.chapter) === base && ((q.lesson ?? '').trim() === title || lessonKey(q.chapter) === lessonKey(mLesson)));
+      return all.filter((q) => selectedLessons.some((l) => baseChapter(q.chapter) === baseChapter(l) && ((q.lesson ?? '').trim() === lessonTitle(l) || lessonKey(q.chapter) === lessonKey(l))));
     }
     return all;
   }
@@ -1290,8 +1290,8 @@ export default function App() {
     const examRows = await supabaseInsert<ExamRecord[]>('exams', {
       title: examTitle.trim() || `Đề Toán lớp ${mGrade}`,
       grade: mGrade,
-      scope_chapter: scopeMode === 'chapter' ? mChapter : scopeMode === 'lesson' ? baseChapter(mLesson) : '',
-      scope_lesson: scopeMode === 'lesson' ? mLesson : '',
+      scope_chapter: scopeMode === 'chapter' ? selectedChapters.join('; ') : scopeMode === 'lesson' ? [...new Set(selectedLessons.map((l) => baseChapter(l)))].join('; ') : '',
+      scope_lesson: scopeMode === 'lesson' ? selectedLessons.join('; ') : '',
       matrix: { levelNeed, partNeed, partPoints, examLang },
       codes: codes.map((c) => ({ code: c.code, questionIds: c.questions.map((q) => q.id), questionPoints: c.questions.map((q) => Number(q.points || 0)), rawPoints: c.rawPoints })),
       duration_minutes: duration,
@@ -1334,6 +1334,8 @@ export default function App() {
         setMatrixMsg(`Thầy đặt điểm cho ${QTYPE_LABEL[badPart]} lớn hơn 0 nhé.`);
         return;
       }
+      if (scopeMode === 'chapter' && !selectedChapters.length) { setMatrixMsg('Thầy tích ít nhất một chương nhé.'); return; }
+      if (scopeMode === 'lesson' && !selectedLessons.length) { setMatrixMsg('Thầy tích ít nhất một bài nhé.'); return; }
       const pool = await loadScopedPool();
       const buckets = {} as Record<Level, Record<QType, Question[]>>;
       for (const l of LEVELS) {
@@ -2038,10 +2040,10 @@ export default function App() {
           <h2>Tạo đề theo ma trận</h2>
           <div className="filters">
             <label>Ngôn ngữ đề<select value={examLang} onChange={(e) => setExamLang(e.target.value as 'vi' | 'en')}><option value="vi">Tiếng Việt</option><option value="en">Tiếng Anh</option></select></label>
-            <label>Lớp<select value={mGrade} onChange={(e) => { setMGrade(Number(e.target.value)); setMChapter(''); setMLesson(''); }}><option>10</option><option>11</option><option>12</option></select></label>
+            <label>Lớp<select value={mGrade} onChange={(e) => { setMGrade(Number(e.target.value)); setMChapter(''); setMLesson(''); setSelectedChapters([]); setSelectedLessons([]); }}><option>10</option><option>11</option><option>12</option></select></label>
             <label>Phạm vi<select value={scopeMode} onChange={(e) => setScopeMode(e.target.value as 'all' | 'chapter' | 'lesson')}><option value="all">Toàn khối</option><option value="chapter">Theo chương</option><option value="lesson">Theo bài</option></select></label>
-            {scopeMode === 'chapter' && <label>Chương<select value={mChapter} onChange={(e) => setMChapter(e.target.value)}>{scopeChapters.map((c) => <option key={c.name} value={c.name}>{c.name} ({c.count} câu)</option>)}</select></label>}
-            {scopeMode === 'lesson' && <label>Bài<select value={mLesson} onChange={(e) => setMLesson(e.target.value)}>{scopeLessons.map((l) => <option key={l.name} value={l.name}>{l.name} ({l.count} câu)</option>)}</select></label>}
+            {scopeMode === 'chapter' && <div className="scope-checks"><strong>Tích chương cần kiểm tra ({selectedChapters.length})</strong>{scopeChapters.map((c) => <label key={c.name}><input type="checkbox" checked={selectedChapters.includes(c.name)} onChange={(e) => setSelectedChapters(e.target.checked ? [...selectedChapters, c.name] : selectedChapters.filter((x) => x !== c.name))} /> {c.name} ({c.count} câu)</label>)}</div>}
+            {scopeMode === 'lesson' && <div className="scope-checks"><strong>Tích bài cần kiểm tra ({selectedLessons.length})</strong>{scopeLessons.map((l) => <label key={l.name}><input type="checkbox" checked={selectedLessons.includes(l.name)} onChange={(e) => setSelectedLessons(e.target.checked ? [...selectedLessons, l.name] : selectedLessons.filter((x) => x !== l.name))} /> {l.name} ({l.count} câu)</label>)}</div>}
             <label>Số mã đề<input type="number" min={1} max={50} value={numCodes} onChange={(e) => setNumCodes(Math.max(1, Math.min(50, Number(e.target.value))))} /></label>
           </div>
           <h3>Số câu theo mức</h3>
@@ -2058,7 +2060,7 @@ export default function App() {
             const partGroup: Record<QType, string> = { single: 'TNKQ nhiều lựa chọn', tf: 'TNKQ đúng - sai', short: 'TNKQ trả lời ngắn', essay: 'Tự luận' };
             const codeOf: Record<QType, string> = { single: 'TNNLC', tf: 'TNĐS', short: 'TLN', essay: 'TL' };
             const yeuCau: Record<string, string> = { B: 'Nhận biết: nhận biết được các khái niệm, định nghĩa, tính chất cơ bản của nội dung.', H: 'Thông hiểu: hiểu và áp dụng trực tiếp kiến thức, tính chất vào bài toán quen thuộc.', VD: 'Vận dụng: vận dụng kiến thức để giải quyết bài toán, kể cả bài toán thực tiễn.' };
-            const lessonsAll = scopeLessons.filter((l) => scopeMode === 'all' || (scopeMode === 'chapter' ? baseChapter(l.name) === mChapter : lessonTitle(l.name) === lessonTitle(mLesson)));
+            const lessonsAll = scopeLessons.filter((l) => scopeMode === 'all' || (scopeMode === 'chapter' ? selectedChapters.includes(baseChapter(l.name)) : selectedLessons.includes(l.name)));
             const lessons = lessonsAll.length ? lessonsAll : [{ name: lessonTitle(mLesson) || `Toàn khối ${mGrade}`, count: 0 }];
             const dist: Record<string, number>[] = lessons.map(() => ({}));
             if (cells) { let seed = 0; for (const q of QTYPES) { for (const g of groups) { const total = g.levels.reduce((a, l) => a + cells[l][q], 0); for (let i = 0; i < total; i++) { const idx = (seed + i) % lessons.length; dist[idx][`${q}|${g.key}`] = (dist[idx][`${q}|${g.key}`] ?? 0) + 1; } seed += 1; } } }
