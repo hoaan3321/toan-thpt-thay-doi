@@ -72,7 +72,7 @@ main { animation: page-in .28s ease both; }
 .header-icon-btn:hover, .compact-install:hover { transform: translateY(-1px); box-shadow: var(--shadow); }
 .compact-install { margin-top: 0; background: linear-gradient(135deg, #4f46e5, #2563eb); color: #fff; border: 0; }
 .hamburger { width: 42px; padding-inline: 0; font-size: 19px; display: none; }
-.app-nav { display: flex; gap: 6px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line-soft); overflow-x: auto; scrollbar-width: none; }
+.app-nav { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line-soft); }
 .app-nav::-webkit-scrollbar { display: none; }
 .app-nav section { display: contents; }
 .app-nav h3 { display: none; }

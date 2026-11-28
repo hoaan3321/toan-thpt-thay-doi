@@ -1702,7 +1702,7 @@ export default function App() {
     const lessonsAll = scopeLessons.filter((l) => scopeMode === 'all' || (scopeMode === 'chapter' ? selectedChapters.includes(baseChapter(l.name)) : selectedLessons.includes(l.name)));
     const lessons = lessonsAll.length ? lessonsAll : [{ name: lessonTitle(mLesson) || `Toàn khối ${mGrade}`, count: 0 }];
     const dist: Record<string, number>[] = lessons.map(() => ({}));
-    if (cells) { const weights = lessons.map((l) => lessonPeriods[l.name] ?? 1); for (const q of QTYPES) { for (const g of groups) { const total = g.levels.reduce((a, l) => a + cells[l][q], 0); const alloc = distributeByWeights(total, weights); alloc.forEach((v, idx) => { if (v > 0) dist[idx][`${q}|${g.key}`] = v; }); } } }
+    if (cells) { const weights = lessons.map((l) => lessonPeriods[lessonTitle(l.name) || l.name] ?? 1); for (const q of QTYPES) { for (const g of groups) { const total = g.levels.reduce((a, l) => a + cells[l][q], 0); const alloc = distributeByWeights(total, weights); alloc.forEach((v, idx) => { if (v > 0) dist[idx][`${q}|${g.key}`] = v; }); } } }
     const totalPts = QTYPES.reduce((a, q) => a + (partNeed[q] > 0 ? partPoints[q] : 0), 0);
     const ptsOf = (i: number, q: QType, gk: string) => (partNeed[q] > 0 ? (dist[i][`${q}|${gk}`] ?? 0) * (partPoints[q] / partNeed[q]) : 0);
     const pct = (v: number) => `${(totalPts > 0 ? (v / totalPts) * 100 : 0).toFixed(1).replace('.', ',')}%`;
@@ -2198,8 +2198,9 @@ export default function App() {
               { key: 'moHinh' as const, label: 'Mô hình hóa toán học' },
             ];
             const compCounts = distributeByWeights(totalQ, compRows.map((r) => compPct[r.key]));
-            const scopeList = scopeLessons.filter((l) => scopeMode === 'all' || (scopeMode === 'chapter' ? selectedChapters.includes(baseChapter(l.name)) : selectedLessons.includes(l.name)));
-            const totalPeriods = scopeList.reduce((a, l) => a + (lessonPeriods[l.name] ?? 1), 0);
+            const scopeListRaw = scopeLessons.filter((l) => scopeMode === 'all' || (scopeMode === 'chapter' ? selectedChapters.includes(baseChapter(l.name)) : selectedLessons.includes(l.name)));
+            const scopeList = scopeListRaw.length ? scopeListRaw : ENGLISH_LESSONS[mGrade].map((name) => ({ name, base: '', count: 0 }));
+            const totalPeriods = scopeList.reduce((a, l) => a + (lessonPeriods[lessonTitle(l.name) || l.name] ?? 1), 0);
             return (
               <section className="ratio-panel">
                 <h3>Tỉ lệ & phân bổ điểm</h3>
@@ -2238,7 +2239,7 @@ export default function App() {
                   <div className="period-list">
                     <strong>Số tiết theo bài</strong>
                     {scopeList.map((l) => (
-                      <label key={l.name}><span>{lessonTitle(l.name) || l.name}</span><input type="number" min={0} step="0.5" value={lessonPeriods[l.name] ?? 1} onChange={(e) => setLessonPeriods({ ...lessonPeriods, [l.name]: Math.max(0, Number(e.target.value)) })} aria-label={`Số tiết ${l.name}`} /></label>
+                      <label key={l.name}><span>{lessonTitle(l.name) || l.name}</span><input type="number" min={0} step="0.5" value={lessonPeriods[lessonTitle(l.name) || l.name] ?? 1} onChange={(e) => setLessonPeriods({ ...lessonPeriods, [lessonTitle(l.name) || l.name]: Math.max(0, Number(e.target.value)) })} aria-label={`Số tiết ${l.name}`} /></label>
                     ))}
                   </div>
                 ) : <p className="muted">Chọn phạm vi theo chương/bài hoặc chờ tải danh sách bài để nhập số tiết từng bài.</p>}
@@ -2255,7 +2256,7 @@ export default function App() {
             const lessonsAll = scopeLessons.filter((l) => scopeMode === 'all' || (scopeMode === 'chapter' ? selectedChapters.includes(baseChapter(l.name)) : selectedLessons.includes(l.name)));
             const lessons = lessonsAll.length ? lessonsAll : [{ name: lessonTitle(mLesson) || `Toàn khối ${mGrade}`, count: 0 }];
             const dist: Record<string, number>[] = lessons.map(() => ({}));
-            if (cells) { const weights = lessons.map((l) => lessonPeriods[l.name] ?? 1); for (const q of QTYPES) { for (const g of groups) { const total = g.levels.reduce((a, l) => a + cells[l][q], 0); const alloc = distributeByWeights(total, weights); alloc.forEach((v, idx) => { if (v > 0) dist[idx][`${q}|${g.key}`] = v; }); } } }
+            if (cells) { const weights = lessons.map((l) => lessonPeriods[lessonTitle(l.name) || l.name] ?? 1); for (const q of QTYPES) { for (const g of groups) { const total = g.levels.reduce((a, l) => a + cells[l][q], 0); const alloc = distributeByWeights(total, weights); alloc.forEach((v, idx) => { if (v > 0) dist[idx][`${q}|${g.key}`] = v; }); } } }
             const ptsOf = (i: number, q: QType, gk: string) => (partNeed[q] > 0 ? (dist[i][`${q}|${gk}`] ?? 0) * (partPoints[q] / partNeed[q]) : 0);
             const totalPts = QTYPES.reduce((a, q) => a + (partNeed[q] > 0 ? partPoints[q] : 0), 0);
             const pct = (v: number) => `${(totalPts > 0 ? (v / totalPts) * 100 : 0).toFixed(1).replace('.', ',')}%`;
