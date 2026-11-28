@@ -2032,6 +2032,26 @@ export default function App() {
               ].map((step, i) => <button key={step.label} className={`quick-step ${step.done ? 'done' : ''}`} onClick={() => setTab(step.tab)}>{step.done ? '✓' : i + 1}. {step.label}</button>)}
             </div>
           </section>
+          <div className="flow-strip">
+            <section className="card flow-card">
+              <h3>Luồng giáo viên</h3>
+              <div className="flow-steps">
+                <button onClick={() => goTab('matrix')}>1. Tạo đề</button><span>→</span>
+                <button onClick={() => goTab('print')}>2. In đề / đáp án</button><span>→</span>
+                <button onClick={() => goTab('assign')}>3. Giao bài</button><span>→</span>
+                <button onClick={() => goTab('results')}>4. Xem kết quả</button>
+              </div>
+            </section>
+            <section className="card flow-card">
+              <h3>Luồng học sinh</h3>
+              <div className="flow-steps">
+                <button onClick={() => goTab('take')}>1. Làm bài</button><span>→</span>
+                <button onClick={() => goTab('practice')}>2. Tự luyện</button><span>→</span>
+                <button onClick={() => goTab('english')}>3. Toán tiếng Anh</button><span>→</span>
+                <button onClick={() => goTab('games')}>4. Trò chơi ôn tập</button>
+              </div>
+            </section>
+          </div>
           <div className="grid dash-groups">
             <section className="card dash-card"><span className="dash-icon">▦</span><h3>Đề thi & câu hỏi</h3><p className="muted">Sinh đề tương đương theo ma trận và xuất bản chuẩn form.</p><div className="filters"><button onClick={() => setTab('matrix')}>Tạo đề theo ma trận</button><button onClick={() => setTab('bank')}>Ngân hàng câu hỏi</button><button onClick={() => setTab('print')}>In đề / đáp án</button><button onClick={() => setTab('admin')}>Quản trị câu hỏi</button></div></section>
             <section className="card dash-card"><span className="dash-icon">◎</span><h3>Lớp học & kết quả</h3><p className="muted">Giao bài bằng mã, chấm tự động và theo dõi tiến bộ.</p><div className="filters"><button onClick={() => setTab('assign')}>Giao bài</button><button onClick={() => setTab('take')}>Học sinh làm bài</button><button onClick={() => setTab('results')}>Kết quả</button><button onClick={() => setTab('payment')}>Thanh toán / gia hạn</button>{isAdmin && <button onClick={() => setTab('users')}>Quản lý người dùng</button>}</div></section>
@@ -2673,6 +2693,13 @@ export default function App() {
           <button onClick={() => goTab('payment')}>Gia hạn</button>
         </div>
       </footer>
+      <nav className="bottom-nav no-print" aria-label="Điều hướng chính">
+        <button className={tab === 'overview' ? 'active' : ''} onClick={() => goTab('overview')}><span>⌂</span>Trang chủ</button>
+        <button className={tab === 'matrix' ? 'active' : ''} onClick={() => goTab('matrix')}><span>✎</span>Tạo đề</button>
+        <button className={tab === 'bank' ? 'active' : ''} onClick={() => goTab('bank')}><span>▦</span>Ngân hàng</button>
+        <button className={tab === 'assign' ? 'active' : ''} onClick={() => goTab('assign')}><span>◎</span>Lớp học</button>
+        <button className={showMobileMenu ? 'active' : ''} onClick={() => { setShowMobileMenu(!showMobileMenu); setShowAccountMenu(false); }}><span>☰</span>Thêm</button>
+      </nav>
       <button className="ai-bubble no-print" onClick={() => setAiOpen(!aiOpen)} aria-label="Mở chat AI">💬</button>
       {aiOpen && (
         <section className="ai-panel no-print">

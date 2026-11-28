@@ -322,6 +322,12 @@ td input { width: 90px; min-height: 36px; padding: 6px 8px; }
   .options-grid.cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .app-footer { display: block; }
   .footer-links { margin-top: 12px; }
+  .bottom-nav { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; background: rgba(255,255,255,.96); border-top: 1px solid var(--line-soft); box-shadow: 0 -8px 24px rgba(15,23,42,.08); padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); justify-content: space-around; }
+  .bottom-nav button { display: grid; justify-items: center; gap: 2px; border: 0; background: transparent; color: var(--ink-2); font-size: 11.5px; font-weight: 600; padding: 5px 8px; border-radius: 12px; min-height: 0; }
+  .bottom-nav button span { font-size: 19px; line-height: 1; }
+  .bottom-nav button.active { color: var(--primary); background: #eef2ff; }
+  .ai-bubble { bottom: 86px; }
+  .ai-panel { bottom: 156px; }
 }
 @media (max-width: 420px) {
   .brand-text strong { font-size: 15.5px; }
@@ -332,6 +338,21 @@ td input { width: 90px; min-height: 36px; padding: 6px 8px; }
 
 .ai-model-picker { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; margin-bottom: 8px; }
 .ai-model-picker select { flex: 1; min-height: 38px; }
+
+/* ---------- Phân luồng app chuyên nghiệp ---------- */
+.bottom-nav { display: none; }
+.flow-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin: 16px 0; }
+.flow-card h3 { margin-top: 0; }
+.flow-steps { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+.flow-steps span { color: var(--muted); font-weight: 700; }
+.flow-steps button { border-radius: 999px; }
+@media (min-width: 1024px) {
+  .app { max-width: 1460px; padding-left: 268px; }
+  .app-nav { position: fixed; left: 16px; top: 104px; width: 232px; max-height: calc(100vh - 124px); overflow: auto; display: grid; gap: 14px; margin: 0; padding: 14px; background: rgba(255,255,255,.92); border: 1px solid var(--line-soft); border-radius: 20px; box-shadow: var(--shadow); z-index: 40; }
+  .app-nav section { display: block; }
+  .app-nav h3 { display: block; margin: 0 0 7px; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  .app-nav button { display: block; width: 100%; text-align: left; margin: 4px 0; border-radius: 12px; }
+}
 
 /* ---------- Tỉ lệ ma trận ---------- */
 .ratio-panel { margin: 16px 0; }
