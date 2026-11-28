@@ -115,7 +115,8 @@ function normalizeTexText(input: string): string {
       const vars = ['y', 'z', 'w', 'u', 'v'];
       let vi = 0;
       return seg
-        .replace(/\\([2-9])/g, '$1')
+        .replace(/(?<!\\)\\([2-9])(?=[A-Za-z])/g, '\\\\$1')
+        .replace(/(?<!\\)\\([2-9])/g, '$1')
         .replace(/\\1(?=[A-Za-z])/g, '\\\\')
         .replace(/\\1(?=\^)/g, '\\\\x')
         .replace(/\\1(?=[+\-≤≥<>])/g, '\\\\x')
