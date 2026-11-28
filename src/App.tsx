@@ -670,6 +670,7 @@ export default function App() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [authRole, setAuthRole] = useState<'student' | 'teacher'>('student');
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [showPassword, setShowPassword] = useState(false);
   const [recoveryToken, setRecoveryToken] = useState('');
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -1442,6 +1443,7 @@ export default function App() {
     setLoading(true); setError('');
     try {
       const s = await signIn(email.trim(), password);
+      localStorage.setItem('toan-thpt-last-active', String(Date.now()));
       setSession(s);
       setMatrixMsg('Đã đăng nhập.');
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setLoading(false); }
@@ -1466,7 +1468,7 @@ export default function App() {
     setLoading(true); setError('');
     try {
       const s = await signUp(email.trim(), password, authRole);
-      if (s) { setSession(s); setMatrixMsg('Đã tạo tài khoản và đăng nhập.'); }
+      if (s) { localStorage.setItem('toan-thpt-last-active', String(Date.now())); setSession(s); setMatrixMsg('Đã tạo tài khoản và đăng nhập.'); }
       else setMatrixMsg('Đã tạo tài khoản. Nếu Supabase yêu cầu xác nhận email, hãy xác nhận rồi đăng nhập.');
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setLoading(false); }
   }
@@ -1887,6 +1889,18 @@ export default function App() {
   useEffect(() => { if (tab === 'english' && hasEnglish && englishMode === 'vocab') { setVocabPage(0); void loadVocab(0); } }, [tab, hasEnglish, englishMode, englishGrade, englishLesson, englishSearch]);
   useEffect(() => { if (tab === 'english') void loadEnglishDangs(); }, [tab, englishGrade, englishLesson]);
   useEffect(() => { const h = new URLSearchParams(window.location.hash.replace(/^#/, '')); if (h.get('type') === 'recovery' && h.get('access_token')) { setRecoveryToken(h.get('access_token') ?? ''); setMatrixMsg('Nhập mật khẩu mới rồi bấm Đặt mật khẩu mới nhé.'); } }, []);
+  useEffect(() => {
+    if (!session) return;
+    const last = Number(localStorage.getItem('toan-thpt-last-active') ?? 0);
+    if (last && Date.now() - last > 3 * 24 * 60 * 60 * 1000) {
+      signOut(); setSession(null); setProfile(null);
+      setError('Phiên đăng nhập đã hết hạn vì 3 ngày không quay lại. Đăng nhập lại nhé.');
+      return;
+    }
+    localStorage.setItem('toan-thpt-last-active', String(Date.now()));
+    const t = window.setInterval(() => localStorage.setItem('toan-thpt-last-active', String(Date.now())), 60000);
+    return () => window.clearInterval(t);
+  }, [session]);
   useEffect(() => { if (session) { void loadProfile(); } else setProfile(null); }, [session]);
   useEffect(() => { if (session && canTeach) void loadTeacherData(); }, [session, canTeach]);
   useEffect(() => { if ((tab === 'admin' || tab === 'users' || tab === 'payment') && isAdmin) void loadProfiles(); }, [tab, isAdmin]);
@@ -1958,6 +1972,45 @@ export default function App() {
     } catch (e) {
       setAiMessages([...next, { role: 'assistant', content: e instanceof Error ? e.message : String(e) }]);
     } finally { setAiBusy(false); }
+  }
+
+  if (!session) {
+    return (
+      <div className="app auth-page">
+        <section className="card auth-card">
+          <div className="auth-brand"><span className="brand-mark">∑</span><div><strong>Toán Thầy Đôi - Love Math</strong><small>Nền tảng dạy & học Toán THPT</small></div></div>
+          {error && <section className="notice danger">{error} <button onClick={() => setError('')}>Đóng</button></section>}
+          {matrixMsg && <p className="notice">{matrixMsg}</p>}
+          {recoveryToken ? (
+            <div className="filters account-form">
+              <strong>Đặt mật khẩu mới</strong>
+              <label>Mật khẩu mới<input type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="mật khẩu mới" /></label>
+              <button onClick={() => setShowPassword(!showPassword)}>{showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}</button>
+              <button className="primary" onClick={() => void handleNewPassword()}>Đặt mật khẩu mới</button>
+              <span>Nhập mật khẩu mới ít nhất 6 ký tự rồi bấm Đặt mật khẩu mới.</span>
+            </div>
+          ) : (
+            <>
+              <div className="filters auth-tabs">
+                <button className={authMode === 'login' ? 'primary' : ''} onClick={() => setAuthMode('login')}>Đăng nhập</button>
+                <button className={authMode === 'register' ? 'primary' : ''} onClick={() => setAuthMode('register')}>Đăng ký</button>
+              </div>
+              <div className="filters account-form">
+                <label>Email<input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email" /></label>
+                <label>Mật khẩu<input type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="mật khẩu" /></label>
+                <button onClick={() => setShowPassword(!showPassword)}>{showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}</button>
+                {authMode === 'register' && <label>Vai trò đăng ký<select value={authRole} onChange={(e) => setAuthRole(e.target.value as 'student' | 'teacher')}><option value="student">Học sinh</option><option value="teacher">Giáo viên</option></select></label>}
+                {authMode === 'login' ? <button className="primary" onClick={() => void handleSignIn()}>Đăng nhập</button> : <button className="primary" onClick={() => void handleSignUp()}>Đăng ký tài khoản</button>}
+                <button onClick={() => void handleRecover()}>Quên mật khẩu</button>
+                <button onClick={() => void handleResend()}>Gửi lại email xác nhận</button>
+                <span>Tài khoản mới được dùng thử full tính năng 3 ngày. Nếu 3 ngày không quay lại, hệ thống sẽ yêu cầu đăng nhập lại.</span>
+              </div>
+            </>
+          )}
+          <button className="install-btn" onClick={() => void installApp()}>📲 Cài ứng dụng</button>
+        </section>
+      </div>
+    );
   }
 
   return (
