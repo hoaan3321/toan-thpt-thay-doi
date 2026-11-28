@@ -51,8 +51,27 @@ interface PaymentRequest {
   amount: number;
   status: 'pending' | 'approved' | 'rejected' | 'paid';
   note: string;
+  transfer_code?: string | null;
+  transaction_ref?: string;
+  balance_after?: number | null;
   created_at: string;
   approved_at?: string | null;
+  paid_at?: string | null;
+}
+
+interface PaymentTransaction {
+  id: number;
+  payment_request_id?: number | null;
+  user_id?: string | null;
+  email: string;
+  amount: number;
+  package_days: number;
+  status: string;
+  provider: string;
+  provider_ref: string;
+  transfer_code: string;
+  balance_after?: number | null;
+  created_at: string;
 }
 
 const PAYMENT_PACKAGES = [
@@ -602,6 +621,8 @@ export default function App() {
   const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>([]);
   const [paymentPackage, setPaymentPackage] = useState(30);
   const [paymentMsg, setPaymentMsg] = useState('');
+  const [paymentTransactions, setPaymentTransactions] = useState<PaymentTransaction[]>([]);
+  const [paymentLastCheck, setPaymentLastCheck] = useState('');
   const [practiceMode, setPracticeMode] = useState<'vi' | 'en'>('vi');
   const [practiceGrade, setPracticeGrade] = useState('12');
   const [practiceLevel, setPracticeLevel] = useState('');
@@ -739,21 +760,35 @@ export default function App() {
   }
 
   async function loadPaymentRequests() {
-    if (!session?.user?.id) { setPaymentRequests([]); return; }
+    if (!session?.user?.id) { setPaymentRequests([]); setPaymentTransactions([]); return; }
     try {
       const p = new URLSearchParams({ select: '*', order: 'created_at.desc', limit: '100' });
       if (!isAdmin) p.set('user_id', `eq.${session.user.id}`);
-      setPaymentRequests(await supabaseGet<PaymentRequest[]>('payment_requests', p, true));
+      const rows = await supabaseGet<PaymentRequest[]>('payment_requests', p, true);
+      setPaymentRequests(rows);
+      const tp = new URLSearchParams({ select: '*', order: 'created_at.desc', limit: '100' });
+      if (!isAdmin) tp.set('user_id', `eq.${session.user.id}`);
+      setPaymentTransactions(await supabaseGet<PaymentTransaction[]>('payment_transactions', tp, true).catch(() => []));
+      setPaymentLastCheck(new Date().toLocaleTimeString('vi-VN'));
+      const completed = rows.find((r) => r.user_id === session.user?.id && (r.status === 'paid' || r.status === 'approved'));
+      if (completed) await loadProfile();
     } catch (e) { setPaymentMsg(e instanceof Error ? e.message : String(e)); }
+  }
+
+  async function checkPaymentNow() {
+    await loadPaymentRequests();
+    await loadProfile();
+    setPaymentMsg('Đã kiểm tra thanh toán. Nếu giao dịch đã hoàn thành, thời hạn tài khoản sẽ tự cập nhật ngay tại đây.');
   }
 
   async function createPaymentRequest() {
     if (!session?.user?.id) { setPaymentMsg('Bạn đăng nhập trước rồi chọn gói gia hạn nhé.'); return; }
     const pack = PAYMENT_PACKAGES.find((x) => x.days === paymentPackage) ?? PAYMENT_PACKAGES[1];
-    const note = `TOANTHPT ${pack.days} NGAY ${session.user.email ?? ''}`.trim();
+    const transferCode = `TTH${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+    const note = transferCode;
     try {
-      await supabaseInsert<PaymentRequest[]>('payment_requests', { user_id: session.user.id, email: session.user.email ?? '', package_days: pack.days, amount: pack.amount, status: 'pending', note }, true);
-      setPaymentMsg(`Đã tạo yêu cầu ${pack.label} — ${pack.amount.toLocaleString('vi-VN')}đ. Nội dung chuyển khoản: ${note}. Quản trị xác nhận thanh toán xong sẽ cộng ${pack.days} ngày vào tài khoản.`);
+      await supabaseInsert<PaymentRequest[]>('payment_requests', { user_id: session.user.id, email: session.user.email ?? '', package_days: pack.days, amount: pack.amount, status: 'pending', note, transfer_code: transferCode }, true);
+      setPaymentMsg(`Đã tạo giao dịch ${pack.label} — ${pack.amount.toLocaleString('vi-VN')}đ. Nội dung chuyển khoản: ${transferCode}. App tự kiểm tra mỗi 10 giây; khi thanh toán hoàn thành, hệ thống tự cộng ${pack.days} ngày.`);
       await loadPaymentRequests();
     } catch (e) { setPaymentMsg(e instanceof Error ? e.message : String(e)); }
   }
@@ -766,9 +801,11 @@ export default function App() {
       const target = rows[0];
       const currentEnd = target ? new Date(target.trial_ends_at).getTime() : 0;
       const base = Math.max(Date.now(), Number.isFinite(currentEnd) ? currentEnd : 0);
+      const balanceAfter = paymentRequests.filter((r) => r.user_id === req.user_id && (r.status === 'paid' || r.status === 'approved')).reduce((sum, r) => sum + Number(r.amount || 0), 0) + Number(req.amount || 0);
       await updateProfile(req.user_id, { trial_ends_at: new Date(base + req.package_days * 86400000).toISOString() });
-      await supabaseUpdate('payment_requests', eqParams({ id: req.id }), { status: 'approved', approved_at: new Date().toISOString() }, true);
-      setPaymentMsg(`Đã duyệt và gia hạn ${req.package_days} ngày cho ${req.email}.`);
+      await supabaseUpdate('payment_requests', eqParams({ id: req.id }), { status: 'paid', paid_at: new Date().toISOString(), approved_at: new Date().toISOString(), transaction_ref: `MANUAL-${req.id}`, balance_after: balanceAfter }, true);
+      await supabaseInsert('payment_transactions', { payment_request_id: req.id, user_id: req.user_id, email: req.email, amount: req.amount, package_days: req.package_days, status: 'paid', provider: 'manual', provider_ref: `MANUAL-${req.id}`, transfer_code: req.transfer_code ?? req.note ?? '', balance_after: balanceAfter }, true).catch(() => null);
+      setPaymentMsg(`Thanh toán đã hoàn thành: đã gia hạn ${req.package_days} ngày cho ${req.email}. Số dư giao dịch sau thanh toán: ${balanceAfter.toLocaleString('vi-VN')}đ.`);
       await loadPaymentRequests();
     } catch (e) { setPaymentMsg(e instanceof Error ? e.message : String(e)); }
   }
@@ -1661,6 +1698,7 @@ export default function App() {
   useEffect(() => { if (session && canTeach) void loadTeacherData(); }, [session, canTeach]);
   useEffect(() => { if ((tab === 'admin' || tab === 'users' || tab === 'payment') && isAdmin) void loadProfiles(); }, [tab, isAdmin]);
   useEffect(() => { if (tab === 'payment') void loadPaymentRequests(); }, [tab, session, isAdmin]);
+  useEffect(() => { if (tab !== 'payment' || !session) return; const t = window.setInterval(() => { void loadPaymentRequests(); }, 10000); return () => window.clearInterval(t); }, [tab, session, isAdmin]);
   useEffect(() => { if (tab === 'results' && session) void loadSubmissions(); }, [tab, session]);
   useEffect(() => { if (tab === 'matrix') void loadScopes(); }, [tab, mGrade]);
   useEffect(() => {
@@ -2257,18 +2295,20 @@ export default function App() {
                 </article>
               ))}
             </div>
-            {session && <div className="filters"><button className="primary" onClick={() => void createPaymentRequest()}>Đăng ký gia hạn {paymentPackage} ngày</button><span className="muted">Nội dung chuyển khoản: TOANTHPT {paymentPackage} NGAY {session.user?.email}</span></div>}
+            {session && <div className="filters"><button className="primary" onClick={() => void createPaymentRequest()}>Tạo giao dịch gia hạn {paymentPackage} ngày</button><button onClick={() => void checkPaymentNow()}>Kiểm tra thanh toán ngay</button><span className="muted">Sau khi tạo giao dịch, chuyển khoản đúng mã giao dịch hiển thị ở lịch sử bên dưới. App tự kiểm tra mỗi 10 giây và tự gia hạn khi thanh toán hoàn thành.</span></div>}
+            {session && (() => { const own = isAdmin ? paymentRequests : paymentRequests.filter((r) => r.user_id === session.user?.id); const paidTotal = own.filter((r) => r.status === 'paid' || r.status === 'approved').reduce((sum, r) => sum + Number(r.amount || 0), 0); const pending = own.filter((r) => r.status === 'pending').length; const daysLeft = profile ? Math.max(0, Math.ceil((new Date(profile.trial_ends_at).getTime() - Date.now()) / 86400000)) : 0; return <div className="grid"><section className="card"><h3>Số dư đã thanh toán</h3><p className="big">{paidTotal.toLocaleString('vi-VN')}đ</p></section><section className="card"><h3>Thời hạn còn lại</h3><p className="big">{isAdmin || profile?.full_access ? 'Full' : `${daysLeft} ngày`}</p></section><section className="card"><h3>Giao dịch chờ hoàn thành</h3><p className="big">{pending}</p><p className="muted">Kiểm tra lần cuối: {paymentLastCheck || '—'}</p></section></div>; })()}
             {paymentMsg && <p className="notice">{paymentMsg}</p>}
           </section>
           <section className="card">
             <h3>{isAdmin ? 'Yêu cầu thanh toán/gia hạn' : 'Lịch sử yêu cầu của bạn'}</h3>
             {!session && <p className="muted">Đăng nhập để xem lịch sử yêu cầu gia hạn.</p>}
             {session && paymentRequests.length === 0 && <p className="muted">Chưa có yêu cầu gia hạn nào.</p>}
+            {paymentTransactions.length > 0 && <><h3>Sổ giao dịch</h3>{paymentTransactions.map((tx) => <article className="question" key={tx.id}><p><strong>{tx.email}</strong> · +{Number(tx.amount).toLocaleString('vi-VN')}đ · Gói {tx.package_days} ngày · {tx.status === 'paid' ? 'Hoàn thành' : tx.status}</p><p className="meta">{new Date(tx.created_at).toLocaleString('vi-VN')} · Mã: {tx.transfer_code || '—'} · Số dư sau giao dịch: {tx.balance_after ? `${Number(tx.balance_after).toLocaleString('vi-VN')}đ` : '—'}</p></article>)}</>}
             {paymentRequests.map((req) => (
               <article className="question" key={req.id}>
                 <p><strong>{req.email}</strong> · Gói {req.package_days} ngày · {req.amount.toLocaleString('vi-VN')}đ · {req.status === 'pending' ? 'Chờ xác nhận' : req.status === 'approved' ? 'Đã gia hạn' : req.status === 'paid' ? 'Đã thanh toán' : 'Đã từ chối'}</p>
-                <p className="meta">{new Date(req.created_at).toLocaleString('vi-VN')} · Nội dung: {req.note}</p>
-                {isAdmin && req.status === 'pending' && <div className="filters"><button className="primary" onClick={() => void approvePaymentRequest(req)}>Duyệt & gia hạn</button><button onClick={() => void rejectPaymentRequest(req)}>Từ chối</button></div>}
+                <p className="meta">{new Date(req.created_at).toLocaleString('vi-VN')} · Mã giao dịch: {req.transfer_code || req.note}{req.balance_after ? ` · Số dư sau giao dịch: ${Number(req.balance_after).toLocaleString('vi-VN')}đ` : ''}</p>
+                {isAdmin && req.status === 'pending' && <div className="filters"><button className="primary" onClick={() => void approvePaymentRequest(req)}>Xác nhận đã nhận tiền & gia hạn</button><button onClick={() => void rejectPaymentRequest(req)}>Từ chối</button></div>}
               </article>
             ))}
           </section>
