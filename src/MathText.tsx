@@ -110,10 +110,22 @@ function normalizeTexText(input: string): string {
     .replace(/\\sqrt(\d{2,})/g, '\\sqrt{$1}')
     .replace(/(\\d?frac\{[^{}]*\})(\d{2,})/g, '$1{$2}')
     .replace(/(\d)\$%/g, '$1%');
-  if (text.includes('\\begin{cases}')) {
-    const vars = ['y', 'z', 'w', 'u', 'v'];
-    let vi = 0;
-    text = text.replace(/\\1(?==)/g, () => `\\\\${vars[vi++] ?? 'y'}`);
+  if (text.includes('\\begin{cases}') || text.includes('\\begin{array}')) {
+    text = text.replace(/\\begin\{(cases|array)\}[\s\S]*?\\end\{\1\}/g, (seg) => {
+      const vars = ['y', 'z', 'w', 'u', 'v'];
+      let vi = 0;
+      return seg
+        .replace(/\\([2-9])/g, '$1')
+        .replace(/\\1(?=[A-Za-z])/g, '\\\\')
+        .replace(/\\1(?=\^)/g, '\\\\x')
+        .replace(/\\1(?=[+\-≤≥<>])/g, '\\\\x')
+        .replace(/\\1(?==)/g, () => `\\\\${vars[vi++] ?? 'y'}`)
+        .replace(/\\1(?=[0-9])/g, '\\\\')
+        .replace(/\\1/g, '\\\\');
+    });
+  }
+  if (((text.match(/\$/g) ?? []).length % 2) === 1) {
+    text = text.replace(/(\d)\$([.,;:”])/g, '$1$2');
   }
   return text;
 }
