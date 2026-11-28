@@ -6,7 +6,7 @@ import { LEVELS, QTYPES, QTYPE_LABEL, type Assignment, type ClassRecord, type Ex
 type Tab = 'overview' | 'bank' | 'theory' | 'english' | 'matrix' | 'print' | 'assign' | 'take' | 'results' | 'admin' | 'users' | 'practice' | 'news' | 'games' | 'payment';
 
 const TAB_META: Record<Tab, { eyebrow: string; title: string; desc: string }> = {
-  overview: { eyebrow: 'Trang chủ', title: 'Toán THPT Thầy Đôi', desc: 'Nền tảng dạy và học Toán THPT.' },
+  overview: { eyebrow: 'Trang chủ', title: 'Toán Thầy Đôi - Love Math', desc: 'Nền tảng dạy và học Toán THPT.' },
   bank: { eyebrow: 'Ngân hàng câu hỏi', title: 'Kho câu hỏi Toán 10–12', desc: 'Lọc theo lớp, bài, dạng và mức độ; xem đáp án cùng lời giải chi tiết.' },
   theory: { eyebrow: 'Học liệu', title: 'Lý thuyết trọng tâm', desc: 'Tóm tắt kiến thức theo chương, trình bày ngắn gọn để dạy và ôn tập.' },
   english: { eyebrow: 'Toán tiếng Anh', title: 'English Math THPT', desc: 'Bài tập, lời giải song ngữ và từ vựng bắt buộc theo từng bài.' },
@@ -1928,9 +1928,9 @@ export default function App() {
     <div className="app">
       <header className="topbar compact-topbar no-print">
         <div className="header-row">
-          <button className="brand-btn" onClick={() => goTab('overview')} aria-label="Về trang chủ Toán THPT Thầy Đôi">
+          <button className="brand-btn" onClick={() => goTab('overview')} aria-label="Về trang chủ Toán Thầy Đôi - Love Math">
             <span className="brand-mark">∑</span>
-            <span className="brand-text"><strong>Toán THPT Thầy Đôi</strong><small className="brand-sub">Nền tảng dạy & học Toán THPT</small></span>
+            <span className="brand-text"><strong>Toán Thầy Đôi - Love Math</strong><small className="brand-sub">Nền tảng dạy & học Toán THPT</small></span>
           </button>
           <div className="header-actions">
             <span className="header-clock"><AppClock /></span>
@@ -2483,7 +2483,7 @@ export default function App() {
       {tab === 'games' && (
         <main className="card no-print">
           <h2>Trò chơi Toán học</h2>
-          <p className="muted">15 trò chơi 3D/thực tế ảo biến tấu riêng của Toán THPT Thầy Đôi, có âm thanh, sân khấu nhập vai và câu hỏi lấy từ ngân hàng theo lớp, bài và mức độ.</p>
+          <p className="muted">15 trò chơi 3D/thực tế ảo biến tấu riêng của Toán Thầy Đôi - Love Math, có âm thanh, sân khấu nhập vai và câu hỏi lấy từ ngân hàng theo lớp, bài và mức độ.</p>
           <div className="filters">
             <label>Ngôn ngữ<select value={gameLang} onChange={(e) => setGameLang(e.target.value as 'vi' | 'en')}><option value="vi">Tiếng Việt</option><option value="en">Tiếng Anh</option></select></label>
             <label>Lớp<select value={gameGrade} onChange={(e) => setGameGrade(Number(e.target.value))}><option>10</option><option>11</option><option>12</option></select></label>
@@ -2663,7 +2663,7 @@ export default function App() {
 
       <footer className="app-footer no-print">
         <div>
-          <strong>∑ Toán THPT Thầy Đôi</strong>
+          <strong>∑ Toán Thầy Đôi - Love Math</strong>
           <p>Ngân hàng câu hỏi · Ma trận đề · Lớp học trực tuyến cho Toán 10–12.</p>
         </div>
         <div className="footer-links">

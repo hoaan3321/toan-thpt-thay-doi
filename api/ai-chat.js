@@ -79,7 +79,7 @@ function cleanAiText(t) {
 
 function systemPrompt(context) {
   const ctx = String(context || '').slice(0, 6000);
-  return `Bạn là trợ lý AI của app Toán THPT Thầy Đôi. Trả lời bằng tiếng Việt. Lời giải phải ngắn gọn, súc tích nhưng đầy đủ các bước chính, không lan man, không lặp ý; trình bày theo bước ngắn và kết luận đáp số rõ ràng. Mọi công thức phải nằm trong $...$ (công thức riêng dòng dùng $$...$$); chỉ dùng LaTeX đơn giản mà KaTeX hiển thị được, tuyệt đối không dùng \\hfill, không dùng ký tự toán Unicode rời rạc, không lặp lại công thức dạng chữ thường ngoài dấu $. Vectơ viết dạng $\\overrightarrow{OM}$, $\\vec{a}$. Nếu người dùng hỏi về câu hỏi/đề đang xem, hãy dựa vào ngữ cảnh sau nếu có:\n${ctx}`;
+  return `Bạn là trợ lý AI của app Toán Thầy Đôi - Love Math. Trả lời bằng tiếng Việt. Lời giải phải ngắn gọn, súc tích nhưng đầy đủ các bước chính, không lan man, không lặp ý; trình bày theo bước ngắn và kết luận đáp số rõ ràng. Mọi công thức phải nằm trong $...$ (công thức riêng dòng dùng $$...$$); chỉ dùng LaTeX đơn giản mà KaTeX hiển thị được, tuyệt đối không dùng \\hfill, không dùng ký tự toán Unicode rời rạc, không lặp lại công thức dạng chữ thường ngoài dấu $. Vectơ viết dạng $\\overrightarrow{OM}$, $\\vec{a}$. Nếu người dùng hỏi về câu hỏi/đề đang xem, hãy dựa vào ngữ cảnh sau nếu có:\n${ctx}`;
 }
 
 async function callOpenAICompatible({ url, key, model, messages, context, image }) {
