@@ -1733,7 +1733,7 @@ export default function App() {
           <button className="install-btn" onClick={() => void installApp()}>📲 Cài ứng dụng</button>
         </div>
         <nav>
-          {([['overview', 'Tổng quan'], ['bank', 'Ngân hàng câu hỏi'], ['theory', 'Lý thuyết'], ['english', 'Toán tiếng Anh'], ['matrix', 'Tạo đề'], ['print', 'In đề'], ['assign', 'Giao bài'], ['take', 'Học sinh làm bài'], ['results', 'Kết quả'], ['practice', 'Tự luyện'], ['games', 'Trò chơi'], ['news', 'Tin giáo dục'], ['payment', 'Thanh toán'], ['admin', 'Quản trị'], ...(isAdmin ? [['users', 'Quản lý người dùng'] as [Tab, string]] : [])] as [Tab, string][]).map(([t, label]) => (
+          {([['overview', 'Bảng điều khiển'], ['bank', 'Ngân hàng câu hỏi'], ['theory', 'Lý thuyết'], ['english', 'Toán tiếng Anh'], ['matrix', 'Tạo đề'], ['print', 'In đề'], ['assign', 'Giao bài'], ['take', 'Học sinh làm bài'], ['results', 'Kết quả'], ['practice', 'Tự luyện'], ['games', 'Trò chơi'], ['news', 'Tin giáo dục'], ['payment', 'Thanh toán'], ['admin', 'Quản trị'], ...(isAdmin ? [['users', 'Quản lý người dùng'] as [Tab, string]] : [])] as [Tab, string][]).map(([t, label]) => (
             <button key={t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)}>{label}</button>
           ))}
         </nav>
@@ -1767,12 +1767,39 @@ export default function App() {
       </section>
 
       {tab === 'overview' && (
-        <main className="grid">
-          <section className="card"><h2>Tổng số câu</h2><p className="big">{overview?.total ?? '—'}</p><p>Lý thuyết: {overview?.theory ?? '—'} bài</p></section>
-          <section className="card"><h2>Theo lớp</h2>{[10, 11, 12].map((g) => <p key={g}>Lớp {g}: <strong>{overview?.byGrade[g] ?? '—'}</strong></p>)}</section>
-          <section className="card"><h2>Theo mức</h2>{LEVELS.map((l) => <p key={l}>{l}: <strong>{overview?.byLevel[l] ?? '—'}</strong></p>)}</section>
-          <section className="card"><h2>Theo phần</h2>{QTYPES.map((q) => <p key={q}>{QTYPE_LABEL[q]}: <strong>{overview?.byType[q] ?? '—'}</strong></p>)}</section>
-          <section className="card"><h2>Toán tiếng Anh</h2><p className="big">{englishTotalAll || '—'}</p><p>Bài toán THPT bằng tiếng Anh, có đáp án, lời giải Anh–Việt và từ vựng.</p><button className="primary" onClick={() => setTab('english')}>Mở mục Toán tiếng Anh</button></section>
+        <main>
+          <section className="card dash-hero">
+            <div>
+              <h2>Hôm nay, thầy muốn làm gì?</h2>
+              <p className="muted">Tạo đề theo ma trận, tự động lưu, giao bài cho lớp và xem kết quả ngay trong một nơi.</p>
+            </div>
+            <button className="primary dash-cta" onClick={() => setTab('matrix')}>+ Tạo đề mới</button>
+          </section>
+          <section className="card">
+            <h3>Bắt đầu nhanh</h3>
+            <div className="quick-steps">
+              {[
+                { label: 'Tạo đề theo ma trận', done: generated.length > 0 || exams.length > 0, tab: 'matrix' as Tab },
+                { label: 'Đề tự động lưu', done: exams.length > 0, tab: 'matrix' as Tab },
+                { label: 'Giao bài cho lớp', done: assignments.length > 0, tab: 'assign' as Tab },
+                { label: 'Xem kết quả', done: submissions.length > 0, tab: 'results' as Tab },
+                { label: 'Thử trò chơi trên lớp', done: false, tab: 'games' as Tab },
+              ].map((step, i) => <button key={step.label} className={`quick-step ${step.done ? 'done' : ''}`} onClick={() => setTab(step.tab)}>{step.done ? '✓' : i + 1}. {step.label}</button>)}
+            </div>
+          </section>
+          <div className="grid dash-groups">
+            <section className="card dash-card"><h3>Đề thi & câu hỏi</h3><div className="filters"><button onClick={() => setTab('matrix')}>Tạo đề theo ma trận</button><button onClick={() => setTab('bank')}>Ngân hàng câu hỏi</button><button onClick={() => setTab('print')}>In đề / đáp án</button><button onClick={() => setTab('admin')}>Quản trị câu hỏi</button></div></section>
+            <section className="card dash-card"><h3>Lớp học & kết quả</h3><div className="filters"><button onClick={() => setTab('assign')}>Giao bài</button><button onClick={() => setTab('take')}>Học sinh làm bài</button><button onClick={() => setTab('results')}>Kết quả</button><button onClick={() => setTab('payment')}>Thanh toán / gia hạn</button></div></section>
+            <section className="card dash-card"><h3>Dạy học trên lớp</h3><div className="filters"><button onClick={() => setTab('theory')}>Lý thuyết</button><button onClick={() => setTab('english')}>Toán tiếng Anh</button><button onClick={() => setTab('practice')}>Tự luyện</button><button onClick={() => setTab('news')}>Tin giáo dục</button></div></section>
+            <section className="card dash-card"><h3>Trò chơi ôn tập</h3><p className="muted">15 trò chơi có âm thanh, sân khấu 3D/thực tế ảo và kỷ lục cho học sinh.</p><button className="primary" onClick={() => setTab('games')}>Mở trò chơi</button></section>
+          </div>
+          <div className="grid">
+            <section className="card"><h2>Tổng số câu</h2><p className="big">{overview?.total ?? '—'}</p><p>Lý thuyết: {overview?.theory ?? '—'} bài</p></section>
+            <section className="card"><h2>Theo lớp</h2>{[10, 11, 12].map((g) => <p key={g}>Lớp {g}: <strong>{overview?.byGrade[g] ?? '—'}</strong></p>)}</section>
+            <section className="card"><h2>Theo mức</h2>{LEVELS.map((l) => <p key={l}>{l}: <strong>{overview?.byLevel[l] ?? '—'}</strong></p>)}</section>
+            <section className="card"><h2>Theo phần</h2>{QTYPES.map((q) => <p key={q}>{QTYPE_LABEL[q]}: <strong>{overview?.byType[q] ?? '—'}</strong></p>)}</section>
+            <section className="card"><h2>Toán tiếng Anh</h2><p className="big">{englishTotalAll || '—'}</p><p>Bài toán THPT bằng tiếng Anh, có đáp án, lời giải Anh–Việt và từ vựng.</p><button className="primary" onClick={() => setTab('english')}>Mở mục Toán tiếng Anh</button></section>
+          </div>
         </main>
       )}
 
