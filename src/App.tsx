@@ -1554,8 +1554,8 @@ export default function App() {
       const p = new URLSearchParams();
       p.set('select', '*');
       p.set('id', `in.(${enIds.join(',')})`);
-      const rows = await supabaseGet<Question[]>('english_questions', p, true).catch(() => [] as Question[]);
-      for (const q of rows) byId.set(q.id + 900000000, { ...q, id: q.id + 900000000 });
+      const rows = await supabaseGet<EnglishQuestion[]>('english_questions', p, true).catch(() => [] as EnglishQuestion[]);
+      for (const q of rows) byId.set(q.id + 900000000, { id: q.id + 900000000, grade: q.grade, chapter: q.lesson_vi, lesson: q.lesson_vi, dang: q.dang, level: q.level as Level, qtype: q.qtype, content: q.problem, options: q.options ?? [], correct: q.answer, explanation: q.solution_en, points: 0 });
     }
     return ids.map((id) => byId.get(id)).filter(Boolean) as Question[];
   }
@@ -2489,6 +2489,23 @@ export default function App() {
                     {createdCodes.map((c, i) => <button key={c.code} className={i === createdCodeIdx ? 'primary' : ''} onClick={() => setCreatedCodeIdx(i)}>Mã đề {String(c.code).padStart(2, '0')}</button>)}
                     <button onClick={() => setTab('print')}>In đề / Xuất file</button>
                   </div>
+                  <h4>Xem nhanh đề — Mã {String(code.code).padStart(2, '0')}</h4>
+                  {QTYPES.map((qt) => {
+                    const qs = code.questions.filter((q) => q.qtype === qt);
+                    if (!qs.length) return null;
+                    return (
+                      <div key={qt}>
+                        <h5>{partLabel[qt]}</h5>
+                        {qs.map((q, i) => (
+                          <article className="question" key={q.id}>
+                            <p><strong>Câu {i + 1}.</strong> <MathText text={stripSourcePrefix(q.content)} /></p>
+                            {q.image_url && <img className="figure" src={q.image_url} alt="Hình minh họa" />}
+                            {q.options?.length > 0 && <div className={`options-grid cols-${optionLayout(q.options)}`}>{q.options.map((op, oi) => <span key={oi}><strong>{'ABCD'[oi] ?? oi + 1}.</strong> <MathText text={stripOptionPrefix(op)} /></span>)}</div>}
+                          </article>
+                        ))}
+                      </div>
+                    );
+                  })}
                   <h4>Ma trận đề (Mã {String(code.code).padStart(2, '0')})</h4>
                   <div className="tablewrap"><table className="matrix-table">
                     <thead><tr><th>TT</th><th>Chương/chủ đề</th><th>Nội dung/đơn vị kiến thức</th>{QTYPES.map((p) => <th key={p} colSpan={3}>{partLabel[p]}</th>)}<th>Tổng điểm</th><th>Tỉ lệ %</th></tr>
@@ -2557,6 +2574,7 @@ export default function App() {
                     {qs.map((q, i) => (
                       <article className="question" key={q.id}>
                         <p><strong>Câu {i + 1}.</strong> <MathText text={stripSourcePrefix(q.content)} /></p>
+                        {q.image_url && <img className="figure" src={q.image_url} alt="Hình minh họa" />}
                         {q.options?.length > 0 && <div className={`options-grid cols-${optionLayout(q.options)}`}>{q.options.map((op, oi) => <span key={oi}><strong>{'ABCD'[oi] ?? oi + 1}.</strong> <MathText text={stripOptionPrefix(op)} /></span>)}</div>}
                         {showAnswers && <div className="answer"><p><strong>Đáp án:</strong> <MathText text={q.correct} /></p>{q.explanation && <p><strong>Lời giải:</strong> <MathText text={q.explanation} /></p>}</div>}
                       </article>
