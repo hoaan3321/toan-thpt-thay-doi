@@ -1422,7 +1422,7 @@ export default function App() {
 
   async function handleNewPassword() {
     if (!recoveryToken || password.length < 6) { setError('Mật khẩu mới cần ít nhất 6 ký tự.'); return; }
-    try { await updatePassword(recoveryToken, password); setRecoveryToken(''); window.history.replaceState(null, '', window.location.pathname); setMatrixMsg('Đã đổi mật khẩu. Đăng nhập bằng mật khẩu mới nhé.'); } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+    try { await updatePassword(recoveryToken, password); setRecoveryToken(''); signOut(); setSession(null); setProfile(null); setPassword(''); window.history.replaceState(null, '', window.location.pathname); setMatrixMsg('Đã đổi mật khẩu. Đăng nhập bằng mật khẩu mới nhé.'); } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
   }
 
   async function handleSignUp() {
@@ -1849,7 +1849,14 @@ export default function App() {
         )}
         {(showAccountMenu || recoveryToken) && (
           <section className="account-panel">
-            {session ? (
+            {recoveryToken ? (
+              <div className="filters account-form">
+                <strong>Đặt mật khẩu mới</strong>
+                <label>Mật khẩu mới<input type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="mật khẩu mới" /></label><button onClick={() => setShowPassword(!showPassword)}>{showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}</button>
+                <button className="primary" onClick={() => void handleNewPassword()}>Đặt mật khẩu mới</button>
+                <span>Nhập mật khẩu mới ít nhất 6 ký tự rồi bấm Đặt mật khẩu mới.</span>
+              </div>
+            ) : session ? (
               <div className="account-info">
                 <strong>{isAdmin ? 'Quản trị' : profile?.role === 'teacher' ? 'Giáo viên' : 'Học sinh'}: {session.user?.email ?? 'đã đăng nhập'}</strong>
                 <span>{isAdmin ? 'Toàn quyền' : profile?.full_access ? 'Đã được cấp full tính năng' : inTrial ? `Dùng thử full tính năng đến ${new Date(profile!.trial_ends_at).toLocaleDateString('vi-VN')}` : 'Tài khoản giới hạn — liên hệ quản trị để cấp quyền'}</span>
