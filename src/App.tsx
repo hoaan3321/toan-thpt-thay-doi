@@ -191,9 +191,10 @@ function optionLayout(options: string[]): 4 | 2 | 1 {
   return 1;
 }
 
-function examDateTime(): string {
+function examDateTime(en = false): string {
   const d = new Date();
   const pad = (v: number) => String(v).padStart(2, '0');
+  if (en) return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}, ${pad(d.getHours())}:${pad(d.getMinutes())}`;
   return `Ngày ${pad(d.getDate())} tháng ${pad(d.getMonth() + 1)} năm ${d.getFullYear()}, ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
@@ -651,6 +652,8 @@ export default function App() {
 
   const [mGrade, setMGrade] = useState(12);
   const [examLang, setExamLang] = useState<'vi' | 'en'>('vi');
+  const en = examLang === 'en';
+  const partLabelOf = (qt: QType) => (en ? QTYPE_LABEL_EN[qt] : QTYPE_LABEL[qt]);
   const [scopeMode, setScopeMode] = useState<'all' | 'chapter' | 'lesson'>('all');
   const [mChapter, setMChapter] = useState('');
   const [mLesson, setMLesson] = useState('');
@@ -1162,7 +1165,113 @@ export default function App() {
     } finally { setLoading(false); }
   }
 
-  function baseChapter(chapter: string): string {
+  const LESSON_EN: Record<string, string> = {
+  "Ba đường conic": "Conic sections",
+  "Ba đường conic và ứng dụng": "Conic sections and applications",
+  "Bất phương trình bậc nhất hai ẩn": "Linear inequalities",
+  "Biến cố hợp, biến cố giao, biến cố độc lập": "Independent events",
+  "Biến cố và định nghĩa cổ điển của xác suất": "Classical probability",
+  "Biểu thức toạ độ của các phép toán vectơ": "Coordinate expressions of vector operations",
+  "Các khái niệm mở đầu": "Introduction to vectors",
+  "Các phép toán trên tập hợp": "Set operations",
+  "Các quy tắc tính đạo hàm": "Differentiation rules",
+  "Các số đặc trưng đo độ phân tán": "Measures of dispersion",
+  "Các số đặc trưng đo xu thế trung tâm": "Measures of central tendency",
+  "Các số đặc trưng đo xu thế trung tâm cho mẫu số liệu ghép nhóm": "Central tendency for grouped data",
+  "Cấp số cộng": "Arithmetic progressions",
+  "Cấp số nhân": "Geometric progressions",
+  "Công thức cộng xác suất": "Addition rule for probability",
+  "Công thức lượng giác": "Trigonometric formulas",
+  "Công thức nhân xác suất cho hai biến cố độc lập": "Multiplication rule for independent events",
+  "Công thức tính góc trong không gian": "Angle formulas in space",
+  "Công thức xác suất toàn phần và công thức Bayes": "Law of total probability and Bayes' theorem",
+  "Đạo hàm cấp hai": "Second derivatives",
+  "Dấu của tam thức bậc hai": "Sign of a quadratic trinomial",
+  "Dãy số": "Sequences",
+  "Định nghĩa và ý nghĩa của đạo hàm": "Definition and meaning of derivatives",
+  "Đường thẳng song song với mặt phẳng": "A line parallel to a plane",
+  "Đường thẳng và mặt phẳng trong không gian": "Lines and planes in space",
+  "Đường thẳng vuông góc với mặt phẳng": "A line perpendicular to a plane",
+  "Đường tiệm cận của đồ thị hàm số": "Asymptotes",
+  "Đường tròn trong mặt phẳng tọa độ": "Circles in the coordinate plane",
+  "Giá trị lớn nhất và giá trị nhỏ nhất của hàm số": "Maximum and minimum values",
+  "Giá trị lượng giác của góc lượng giác": "Trigonometric values of a trigonometric angle",
+  "Giá trị lượng giác của một góc từ 0° đến 180°": "Trigonometric values",
+  "Giới hạn của dãy số": "Limits of sequences",
+  "Giới hạn của hàm số": "Limits of functions",
+  "Hai đường thẳng song song": "Parallel lines",
+  "Hai đường thẳng vuông góc": "Perpendicular lines",
+  "Hai mặt phẳng song song": "Parallel planes",
+  "Hai mặt phẳng vuông góc": "Perpendicular planes",
+  "Hàm số": "Functions",
+  "Hàm số bậc hai": "Quadratic functions",
+  "Hàm số liên tục": "Continuous functions",
+  "Hàm số lượng giác": "Trigonometric functions",
+  "Hàm số mũ và hàm số lôgarit": "Exponential and logarithmic functions",
+  "Hệ bất phương trình bậc nhất hai ẩn": "Systems of linear inequalities",
+  "Hệ phương trình bậc nhất ba ẩn": "Linear systems in three variables",
+  "Hệ thức lượng trong tam giác": "Metric relations in triangles",
+  "Hệ trục tọa độ trong không gian": "Coordinate system in space",
+  "Hoán vị, chỉnh hợp và tổ hợp": "Permutations, arrangements and combinations",
+  "Khảo sát sự biến thiên và vẽ đồ thị của hàm số": "Investigating and graphing functions",
+  "Khoảng biến thiên và khoảng tứ phân vị": "Range and interquartile range",
+  "Khoảng cách": "Distance",
+  "Làm quen với một vài khái niệm của lí thuyết đồ thị": "Introduction to graph theory",
+  "Lôgarit": "Logarithms",
+  "Lũy thừa với số mũ thực": "Powers with real exponents",
+  "Mẫu số liệu ghép nhóm": "Grouped data",
+  "Mệnh đề": "Propositions",
+  "Một số yếu tố vẽ kĩ thuật": "Elements of technical drawing",
+  "Nguyên hàm": "Antiderivatives",
+  "Nhị thức Newton": "Binomial theorem",
+  "Phép biến hình trong mặt phẳng": "Transformations in the plane",
+  "Phép chiếu song song": "Parallel projection",
+  "Phép chiếu vuông góc. Góc giữa đường thẳng và mặt phẳng": "Orthogonal projection and angle between line and plane",
+  "Phương pháp quy nạp toán học. Nhị thức Newton": "Mathematical induction and binomial theorem",
+  "Phương sai và độ lệch chuẩn": "Variance and standard deviation",
+  "Phương trình đường thẳng": "Equations of lines",
+  "Phương trình đường thẳng trong không gian": "Equations of lines in space",
+  "Phương trình lượng giác": "Trigonometric equations",
+  "Phương trình mặt cầu": "Equations of spheres",
+  "Phương trình mặt phẳng": "Equations of planes",
+  "Phương trình quy về phương trình bậc hai": "Equations reducible to quadratic equations",
+  "Phương trình, bất phương trình mũ và lôgarit": "Exponential and logarithmic equations",
+  "Quy tắc đếm": "Counting rules",
+  "Số gần đúng và sai số": "Approximate numbers and errors",
+  "Tập hợp": "Sets",
+  "Thể tích": "Volume",
+  "Thực hành tính xác suất theo định nghĩa cổ điển": "Practice with classical probability",
+  "Tích của một vectơ với một số": "Scalar multiplication of a vector",
+  "Tích phân": "Definite integrals",
+  "Tích vô hướng của hai vectơ": "Dot product of two vectors",
+  "Tính đơn điệu và cực trị của hàm số": "Monotonicity and extrema",
+  "Tổng và hiệu của hai vectơ": "Sum and difference of vectors",
+  "Ứng dụng đạo hàm để giải quyết một số vấn đề liên quan đến thực tiễn": "Applications of derivatives",
+  "Ứng dụng hình học của tích phân": "Geometric applications of integrals",
+  "Vectơ trong không gian": "Vectors in space",
+  "Vectơ trong mặt phẳng tọa độ": "Vectors in the coordinate plane",
+  "Vị trí tương đối giữa hai đường thẳng. Góc và khoảng cách": "Relative position, angle and distance",
+  "Xác suất có điều kiện": "Conditional probability",
+};
+
+const QTYPE_LABEL_EN: Record<QType, string> = {
+  single: 'Part I. Multiple choice',
+  tf: 'Part II. True/False',
+  short: 'Part III. Short answer',
+  essay: 'Part IV. Free response',
+};
+
+function lessonEnName(name: string): string {
+  const title = lessonTitle(name) || name;
+  return LESSON_EN[title] ?? title;
+}
+
+function fmtPts(n: number, en: boolean): string {
+  const v = Math.round(Number(n || 0) * 1000) / 1000;
+  return en ? String(v) : String(v).replace('.', ',');
+}
+
+function baseChapter(chapter: string): string {
     return chapter.split(' — ')[0].trim();
   }
 
@@ -1323,7 +1432,7 @@ export default function App() {
     if (!session) { if (!auto) { setError('Hãy đăng nhập giáo viên trước khi lưu đề.'); setTab('assign'); } return null; }
     if (!canTeach) { if (!auto) setError('Tài khoản giáo viên cần full tính năng để lưu đề.'); return null; }
     const examRows = await supabaseInsert<ExamRecord[]>('exams', {
-      title: examTitle.trim() || `Đề Toán lớp ${mGrade}`,
+      title: examTitle.trim() || (en ? `Grade ${mGrade} Math Exam` : `Đề Toán lớp ${mGrade}`),
       grade: mGrade,
       scope_chapter: scopeMode === 'chapter' ? selectedChapters.join('; ') : scopeMode === 'lesson' ? [...new Set(selectedLessons.map((l) => baseChapter(l)))].join('; ') : '',
       scope_lesson: scopeMode === 'lesson' ? selectedLessons.join('; ') : scopeMode === 'chapter' ? scopeLessons.filter((l) => selectedChapters.includes(baseChapter(l.name)) && !excludedLessons.includes(l.name)).map((l) => l.name).join('; ') : '',
@@ -1505,6 +1614,7 @@ export default function App() {
       }
       setGenerated(loaded);
       setMGrade(exam.grade);
+      setExamLang((exam.matrix as { examLang?: string } | null)?.examLang === 'en' ? 'en' : 'vi');
       setExamTitle(exam.title);
       setDuration(exam.duration_minutes ?? 45);
       setMatrixMsg(`Đã mở đề đã lưu “${exam.title}”.`);
@@ -1572,6 +1682,7 @@ export default function App() {
       setCreatedCodes(loaded);
       setCreatedCodeIdx(0);
       setGenerated(loaded);
+      setExamLang((exam.matrix as { examLang?: string } | null)?.examLang === 'en' ? 'en' : 'vi');
       setMGrade(exam.grade);
       setExamTitle(exam.title);
       setDuration(exam.duration_minutes ?? 45);
@@ -1689,22 +1800,22 @@ export default function App() {
     const body: string[] = [];
     generated.forEach((code, ci) => {
       if (ci > 0) body.push('<w:p><w:r><w:br w:type="page"/></w:r></w:p>');
-      body.push(para(`${kind === 'dapan' ? 'ĐÁP ÁN ĐỀ' : 'ĐỀ'} TOÁN LỚP ${mGrade} — MÃ ĐỀ ${String(code.code).padStart(2, '0')}`, { bold: true, size: 28, align: 'center', after: 40 }));
-      body.push(para(`Thời gian: ${duration} phút · Tổng điểm: ${fmtPoints(code.rawPoints)} điểm · ${examDateTime()}`, { align: 'center', after: 120 }));
+      body.push(para(en ? `${kind === 'dapan' ? 'ANSWER KEY — ' : ''}GRADE ${mGrade} MATH EXAM — CODE ${String(code.code).padStart(2, '0')}` : `${kind === 'dapan' ? 'ĐÁP ÁN ĐỀ' : 'ĐỀ'} TOÁN LỚP ${mGrade} — MÃ ĐỀ ${String(code.code).padStart(2, '0')}`, { bold: true, size: 28, align: 'center', after: 40 }));
+      body.push(para(en ? `Time: ${duration} minutes · Total score: ${fmtPts(code.rawPoints, true)} points · ${examDateTime(true)}` : `Thời gian: ${duration} phút · Tổng điểm: ${fmtPoints(code.rawPoints)} điểm · ${examDateTime()}`, { align: 'center', after: 120 }));
       for (const qt of QTYPES) {
         const qs = code.questions.filter((q) => q.qtype === qt);
         if (!qs.length) continue;
-        body.push(para(`${QTYPE_LABEL[qt]} (${fmtPoints(partPointsOf(qs))} điểm)`, { bold: true, before: 120, after: 80 }));
+        body.push(para(en ? `${QTYPE_LABEL_EN[qt]} (${fmtPts(partPointsOf(qs), true)} points)` : `${QTYPE_LABEL[qt]} (${fmtPoints(partPointsOf(qs))} điểm)`, { bold: true, before: 120, after: 80 }));
         qs.forEach((q, i) => {
-          body.push(para(`Câu ${i + 1}. ${stripSourcePrefix(q.content)}`, { after: 40, rich: true }));
+          body.push(para(`${en ? 'Question' : 'Câu'} ${i + 1}. ${stripSourcePrefix(q.content)}`, { after: 40, rich: true }));
           const docxOpts = (q.options ?? []).map((op, oi) => `${'ABCD'[oi] ?? oi + 1}. ${stripOptionPrefix(op)}`);
           const docxLayout = optionLayout(q.options ?? []);
           if (docxLayout === 4) body.push(para(docxOpts.join('        '), { indent: 360, after: 20, rich: true }));
           else if (docxLayout === 2) { body.push(para(docxOpts.slice(0, 2).join('        '), { indent: 360, after: 20, rich: true })); body.push(para(docxOpts.slice(2).join('        '), { indent: 360, after: 20, rich: true })); }
           else docxOpts.forEach((op) => body.push(para(op, { indent: 360, after: 20, rich: true })));
           if (kind === 'dapan') {
-            body.push(para(`Đáp án: ${q.correct}`, { bold: true, indent: 360, after: 20, rich: true }));
-            if (q.explanation) body.push(para(`Lời giải: ${q.explanation}`, { indent: 360, after: 80, rich: true }));
+            body.push(para(`${en ? 'Answer' : 'Đáp án'}: ${q.correct}`, { bold: true, indent: 360, after: 20, rich: true }));
+            if (q.explanation) body.push(para(`${en ? 'Solution' : 'Lời giải'}: ${q.explanation}`, { indent: 360, after: 80, rich: true }));
           }
         });
       }
@@ -1724,21 +1835,21 @@ export default function App() {
   }
 
   function exportDocx(kind: 'de' | 'dapan' = 'de') {
-    downloadBlob(kind === 'dapan' ? 'dap-an.docx' : 'de-toan.docx', examDocxBlob(kind));
+    downloadBlob(en ? (kind === 'dapan' ? 'answer-key.docx' : 'math-exam.docx') : (kind === 'dapan' ? 'dap-an.docx' : 'de-toan.docx'), examDocxBlob(kind));
   }
 
   function matrixExportData() {
     const cap = {} as Record<Level, Record<QType, number>>;
     for (const l of LEVELS) { cap[l] = {} as Record<QType, number>; for (const q of QTYPES) cap[l][q] = 999; }
     const cells = standardCells(levelNeed, partNeed, partPoints) ?? buildCellCounts(levelNeed, partNeed, cap);
-    const groups: { key: string; label: string; levels: Level[] }[] = [{ key: 'B', label: 'Biết', levels: ['NB'] }, { key: 'H', label: 'Hiểu', levels: ['TH'] }, { key: 'VD', label: 'VD', levels: ['VD', 'VDC'] }];
+    const groups: { key: string; label: string; levels: Level[] }[] = [{ key: 'B', label: en ? 'Knowing' : 'Biết', levels: ['NB'] }, { key: 'H', label: en ? 'Understanding' : 'Hiểu', levels: ['TH'] }, { key: 'VD', label: en ? 'Applying' : 'VD', levels: ['VD', 'VDC'] }];
     const lessonsAll = scopeLessons.filter((l) => scopeMode === 'all' || (scopeMode === 'chapter' ? (selectedChapters.includes(baseChapter(l.name)) && !excludedLessons.includes(l.name)) : selectedLessons.includes(l.name)));
     const lessons = lessonsAll.length ? lessonsAll : [{ name: lessonTitle(mLesson) || `Toàn khối ${mGrade}`, count: 0 }];
     const dist: Record<string, number>[] = lessons.map(() => ({}));
     if (cells) { const weights = lessons.map((l) => lessonPeriods[lessonTitle(l.name) || l.name] ?? 1); for (const q of QTYPES) { for (const g of groups) { const total = g.levels.reduce((a, l) => a + cells[l][q], 0); const alloc = distributeByWeights(total, weights); alloc.forEach((v, idx) => { if (v > 0) dist[idx][`${q}|${g.key}`] = v; }); } } }
     const totalPts = QTYPES.reduce((a, q) => a + (partNeed[q] > 0 ? partPoints[q] : 0), 0);
     const ptsOf = (i: number, q: QType, gk: string) => (partNeed[q] > 0 ? (dist[i][`${q}|${gk}`] ?? 0) * (partPoints[q] / partNeed[q]) : 0);
-    const pct = (v: number) => `${(totalPts > 0 ? (v / totalPts) * 100 : 0).toFixed(1).replace('.', ',')}%`;
+    const pct = (v: number) => `${(totalPts > 0 ? (v / totalPts) * 100 : 0).toFixed(1).replace('.', en ? '.' : ',')}%`;
     return { cells, groups, lessons, dist, totalPts, ptsOf, pct };
   }
 
@@ -1748,7 +1859,7 @@ export default function App() {
     const para = (text: string, bold = false, align = '') => `<w:p><w:pPr>${align ? `<w:jc w:val="${align}"/>` : ''}<w:spacing w:after="40"/></w:pPr>${run(text, bold)}</w:p>`;
     const cell = (text: string, bold = false) => `<w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="4"/><w:left w:val="single" w:sz="4"/><w:bottom w:val="single" w:sz="4"/><w:right w:val="single" w:sz="4"/></w:tcBorders></w:tcPr>${para(text, bold)}</w:tc>`;
     const table = `<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/></w:tblPr>${rows.map((r, i) => `<w:tr>${r.map((c) => cell(c, i === 0)).join('')}</w:tr>`).join('')}</w:tbl>`;
-    const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${para(title, true, 'center')}${para(`Toán lớp ${mGrade} · ${examDateTime()}`, false, 'center')}${table}<w:sectPr><w:pgSz w:w="16838" w:h="11906" w:orient="landscape"/><w:pgMar w:top="720" w:right="720" w:bottom="720" w:left="720"/></w:sectPr></w:body></w:document>`;
+    const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${para(title, true, 'center')}${para(en ? `Grade ${mGrade} Mathematics · ${examDateTime(true)}` : `Toán lớp ${mGrade} · ${examDateTime()}`, false, 'center')}${table}<w:sectPr><w:pgSz w:w="16838" w:h="11906" w:orient="landscape"/><w:pgMar w:top="720" w:right="720" w:bottom="720" w:left="720"/></w:sectPr></w:body></w:document>`;
     const stylesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"/><w:sz w:val="20"/></w:rPr></w:style></w:styles>`;
     const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>`;
     const rels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`;
@@ -1758,34 +1869,38 @@ export default function App() {
 
   function matrixDocxBlob(): Blob {
     const { cells, groups, lessons, dist, totalPts, ptsOf, pct } = matrixExportData();
-    const rows: string[][] = [['TT', 'Chương/chủ đề', 'Nội dung/đơn vị kiến thức', 'Biết', 'Hiểu', 'VD', 'Tổng câu', 'Tỉ lệ % điểm']];
-    lessons.forEach((l, i) => { const lp = QTYPES.reduce((a, q) => a + groups.reduce((b, g) => b + ptsOf(i, q, g.key), 0), 0); rows.push([String(i + 1), baseChapter(l.name) || l.name, lessonTitle(l.name) || l.name, ...groups.map((g) => String(QTYPES.reduce((a, q) => a + (dist[i][`${q}|${g.key}`] ?? 0), 0) || '')), String(QTYPES.reduce((a, q) => a + groups.reduce((b, g) => b + (dist[i][`${q}|${g.key}`] ?? 0), 0), 0)), pct(lp)]); });
-    rows.push(['', '', 'Tổng số câu', ...groups.map((g) => String(g.levels.reduce((a, l) => a + levelNeed[l], 0))), String(QTYPES.reduce((a, q) => a + partNeed[q], 0)), '100%']);
-    rows.push(['', '', 'Tổng số điểm', ...groups.map((g) => fmtPoints(QTYPES.reduce((a, q) => a + (partNeed[q] > 0 && cells ? g.levels.reduce((b, l) => b + cells[l][q], 0) * (partPoints[q] / partNeed[q]) : 0), 0))), fmtPoints(totalPts), '']);
-    return tableDocxBlob('MA TRẬN ĐỀ KIỂM TRA', rows);
+    const rows: string[][] = [en ? ['No.', 'Chapter/Topic', 'Content/Unit', 'Knowing', 'Understanding', 'Applying', 'Total questions', 'Score %'] : ['TT', 'Chương/chủ đề', 'Nội dung/đơn vị kiến thức', 'Biết', 'Hiểu', 'VD', 'Tổng câu', 'Tỉ lệ % điểm']];
+    lessons.forEach((l, i) => { const lp = QTYPES.reduce((a, q) => a + groups.reduce((b, g) => b + ptsOf(i, q, g.key), 0), 0); rows.push([String(i + 1), en ? lessonEnName(l.name) : (baseChapter(l.name) || l.name), en ? lessonEnName(l.name) : (lessonTitle(l.name) || l.name), ...groups.map((g) => String(QTYPES.reduce((a, q) => a + (dist[i][`${q}|${g.key}`] ?? 0), 0) || '')), String(QTYPES.reduce((a, q) => a + groups.reduce((b, g) => b + (dist[i][`${q}|${g.key}`] ?? 0), 0), 0)), pct(lp)]); });
+    rows.push(['', '', en ? 'Total questions' : 'Tổng số câu', ...groups.map((g) => String(g.levels.reduce((a, l) => a + levelNeed[l], 0))), String(QTYPES.reduce((a, q) => a + partNeed[q], 0)), '100%']);
+    rows.push(['', '', en ? 'Total score' : 'Tổng số điểm', ...groups.map((g) => fmtPts(QTYPES.reduce((a, q) => a + (partNeed[q] > 0 && cells ? g.levels.reduce((b, l) => b + cells[l][q], 0) * (partPoints[q] / partNeed[q]) : 0), 0), en)), fmtPts(totalPts, en), '']);
+    return tableDocxBlob(en ? 'EXAM MATRIX' : 'MA TRẬN ĐỀ KIỂM TRA', rows);
   }
 
   function specDocxBlob(): Blob {
     const { groups, lessons, dist } = matrixExportData();
-    const codeOf: Record<QType, string> = { single: 'TNNLC', tf: 'TNĐS', short: 'TLN', essay: 'TL' };
-    const yeuCau: Record<string, string> = { B: 'Nhận biết: nhận biết được các khái niệm, định nghĩa, tính chất cơ bản của nội dung.', H: 'Thông hiểu: hiểu và áp dụng trực tiếp kiến thức, tính chất vào bài toán quen thuộc.', VD: 'Vận dụng: vận dụng kiến thức để giải quyết bài toán, kể cả bài toán thực tiễn.' };
-    const rows: string[][] = [['STT', 'Chương/chủ đề', 'Nội dung', 'Mức độ kiểm tra, đánh giá', 'Nhận biết', 'Thông hiểu', 'Vận dụng']];
-    lessons.forEach((l, i) => rows.push([String(i + 1), baseChapter(l.name) || l.name, lessonTitle(l.name) || l.name, groups.filter((g) => QTYPES.some((q) => (dist[i][`${q}|${g.key}`] ?? 0) > 0)).map((g) => yeuCau[g.key]).join(' '), ...groups.map((g) => QTYPES.filter((q) => (dist[i][`${q}|${g.key}`] ?? 0) > 0).map((q) => `${dist[i][`${q}|${g.key}`]}${codeOf[q]}`).join(' '))]));
-    return tableDocxBlob('BẢNG ĐẶC TẢ ĐỀ KIỂM TRA', rows);
+    const codeOf: Record<QType, string> = en ? { single: 'MC', tf: 'TF', short: 'SA', essay: 'FR' } : { single: 'TNNLC', tf: 'TNĐS', short: 'TLN', essay: 'TL' };
+    const yeuCau: Record<string, string> = en ? { B: 'Knowing: recognize the basic concepts, definitions and properties of the content.', H: 'Understanding: understand and directly apply knowledge and properties to familiar problems.', VD: 'Applying: apply knowledge to solve problems, including real-life problems.' } : { B: 'Nhận biết: nhận biết được các khái niệm, định nghĩa, tính chất cơ bản của nội dung.', H: 'Thông hiểu: hiểu và áp dụng trực tiếp kiến thức, tính chất vào bài toán quen thuộc.', VD: 'Vận dụng: vận dụng kiến thức để giải quyết bài toán, kể cả bài toán thực tiễn.' };
+    const rows: string[][] = [en ? ['No.', 'Chapter/Topic', 'Content', 'Assessment level', 'Knowing', 'Understanding', 'Applying'] : ['STT', 'Chương/chủ đề', 'Nội dung', 'Mức độ kiểm tra, đánh giá', 'Nhận biết', 'Thông hiểu', 'Vận dụng']];
+    lessons.forEach((l, i) => rows.push([String(i + 1), en ? lessonEnName(l.name) : (baseChapter(l.name) || l.name), en ? lessonEnName(l.name) : (lessonTitle(l.name) || l.name), groups.filter((g) => QTYPES.some((q) => (dist[i][`${q}|${g.key}`] ?? 0) > 0)).map((g) => yeuCau[g.key]).join(' '), ...groups.map((g) => QTYPES.filter((q) => (dist[i][`${q}|${g.key}`] ?? 0) > 0).map((q) => `${dist[i][`${q}|${g.key}`]}${codeOf[q]}`).join(' '))]));
+    return tableDocxBlob(en ? 'EXAM SPECIFICATION' : 'BẢNG ĐẶC TẢ ĐỀ KIỂM TRA', rows);
   }
 
   async function downloadExamBundle() {
     if (!generated.length) { setMatrixMsg('Hãy sinh mã đề trước khi tải bộ đề.'); return; }
     try {
       setMatrixMsg('Đang tạo bộ đề gồm đề, ma trận và bảng đặc tả...');
-      const files = [
+      const files = en ? [
+        { name: 'math-exam.docx', blob: examDocxBlob('de') },
+        { name: 'exam-matrix.docx', blob: matrixDocxBlob() },
+        { name: 'specification.docx', blob: specDocxBlob() },
+      ] : [
         { name: 'de-toan.docx', blob: examDocxBlob('de') },
         { name: 'ma-tran-de.docx', blob: matrixDocxBlob() },
         { name: 'bang-dac-ta.docx', blob: specDocxBlob() },
       ];
       const entries: { name: string; data: Uint8Array }[] = [];
       for (const f of files) entries.push({ name: f.name, data: new Uint8Array(await f.blob.arrayBuffer()) });
-      downloadBlob('bo-de-ma-tran-dac-ta.zip', zipStore(entries));
+      downloadBlob(en ? 'math-exam-bundle.zip' : 'bo-de-ma-tran-dac-ta.zip', zipStore(entries));
       setMatrixMsg('Đã tải bộ đề gồm đề, ma trận và bảng đặc tả.');
     } catch (e) {
       setMatrixMsg(`Chưa tải được bộ đề: ${e instanceof Error ? e.message : String(e)}`);
@@ -1794,7 +1909,7 @@ export default function App() {
 
   function exportLatex(kind: 'de' | 'dapan' = 'de') {
     const lines: string[] = [
-      '% Biên dịch bằng XeLaTeX hoặc LuaLaTeX',
+      en ? '% Compile with XeLaTeX or LuaLaTeX' : '% Biên dịch bằng XeLaTeX hoặc LuaLaTeX',
       '\\documentclass[12pt,a4paper]{article}',
       '\\usepackage[margin=2cm]{geometry}',
       '\\usepackage{fontspec}',
@@ -1807,13 +1922,13 @@ export default function App() {
     ];
     generated.forEach((code, ci) => {
       if (ci > 0) lines.push('\\newpage');
-      lines.push(`\\begin{center}\\textbf{\\large ${kind === 'dapan' ? 'ĐÁP ÁN ĐỀ' : 'ĐỀ'} TOÁN LỚP ${mGrade} --- MÃ ĐỀ ${String(code.code).padStart(2, '0')}}\\\\[2pt] Thời gian: ${duration} phút \\quad Tổng điểm: ${fmtPoints(code.rawPoints)} điểm \\quad ${examDateTime()}\\end{center}`);
+      lines.push(en ? `\\begin{center}\\textbf{\\large ${kind === 'dapan' ? 'ANSWER KEY --- ' : ''}GRADE ${mGrade} MATH EXAM --- CODE ${String(code.code).padStart(2, '0')}}\\\\[2pt] Time: ${duration} minutes \\quad Total score: ${fmtPts(code.rawPoints, true)} points \\quad ${examDateTime(true)}\\end{center}` : `\\begin{center}\\textbf{\\large ${kind === 'dapan' ? 'ĐÁP ÁN ĐỀ' : 'ĐỀ'} TOÁN LỚP ${mGrade} --- MÃ ĐỀ ${String(code.code).padStart(2, '0')}}\\\\[2pt] Thời gian: ${duration} phút \\quad Tổng điểm: ${fmtPoints(code.rawPoints)} điểm \\quad ${examDateTime()}\\end{center}`);
       for (const qt of QTYPES) {
         const qs = code.questions.filter((q) => q.qtype === qt);
         if (!qs.length) continue;
-        lines.push(`\\textbf{${QTYPE_LABEL[qt]} (${fmtPoints(partPointsOf(qs))} điểm)}`);
+        lines.push(en ? `\\textbf{${QTYPE_LABEL_EN[qt]} (${fmtPts(partPointsOf(qs), true)} points)}` : `\\textbf{${QTYPE_LABEL[qt]} (${fmtPoints(partPointsOf(qs))} điểm)}`);
         qs.forEach((q, i) => {
-          lines.push(`\\textbf{Câu ${i + 1}.} ${stripSourcePrefix(q.content)}`);
+          lines.push(`\\textbf{${en ? 'Question' : 'Câu'} ${i + 1}.} ${stripSourcePrefix(q.content)}`);
           if (q.options?.length) {
             const texOpts = q.options.map((op, oi) => `\\textbf{${'ABCD'[oi] ?? oi + 1}.} ${stripOptionPrefix(op)}`);
             const texLayout = optionLayout(q.options);
@@ -1822,14 +1937,14 @@ export default function App() {
             else texOpts.forEach((op) => lines.push(op));
           }
           if (kind === 'dapan') {
-            lines.push(`\\textbf{Đáp án:} ${q.correct}`);
-            if (q.explanation) lines.push(`\\textbf{Lời giải:} ${q.explanation}`);
+            lines.push(`\\textbf{${en ? 'Answer' : 'Đáp án'}:} ${q.correct}`);
+            if (q.explanation) lines.push(`\\textbf{${en ? 'Solution' : 'Lời giải'}:} ${q.explanation}`);
           }
         });
       }
     });
     lines.push('\\end{document}');
-    downloadText(kind === 'dapan' ? 'dap-an.tex' : 'de-toan.tex', lines.join('\n'), 'text/x-tex;charset=utf-8');
+    downloadText(en ? (kind === 'dapan' ? 'answer-key.tex' : 'math-exam.tex') : (kind === 'dapan' ? 'dap-an.tex' : 'de-toan.tex'), lines.join('\n'), 'text/x-tex;charset=utf-8');
   }
 
   function exportPdf(kind: 'de' | 'dapan' = 'de') {
@@ -2269,7 +2384,7 @@ export default function App() {
         <main className="card no-print">
           <h2>Tạo đề theo ma trận</h2>
           <div className="filters">
-            <label>Ngôn ngữ đề<select value={examLang} onChange={(e) => setExamLang(e.target.value as 'vi' | 'en')}><option value="vi">Tiếng Việt</option><option value="en">Tiếng Anh</option></select></label>
+            <label>Ngôn ngữ đề<select value={examLang} onChange={(e) => { const v = e.target.value as 'vi' | 'en'; setExamLang(v); if (v === 'en' && (examTitle === 'Đề Toán THPT' || /^Đề Toán lớp/.test(examTitle))) setExamTitle(`Grade ${mGrade} Math Exam`); if (v === 'vi' && /^Grade \d+ Math Exam$/.test(examTitle)) setExamTitle('Đề Toán THPT'); }}><option value="vi">Tiếng Việt</option><option value="en">Tiếng Anh</option></select></label>
             <label>Lớp<select value={mGrade} onChange={(e) => { setMGrade(Number(e.target.value)); setMChapter(''); setMLesson(''); setSelectedChapters([]); setSelectedLessons([]); }}><option>10</option><option>11</option><option>12</option></select></label>
             <label>Phạm vi<select value={scopeMode} onChange={(e) => setScopeMode(e.target.value as 'all' | 'chapter' | 'lesson')}><option value="all">Toàn khối</option><option value="chapter">Theo chương</option><option value="lesson">Theo bài</option></select></label>
             {scopeMode === 'chapter' && <div className="scope-checks"><strong>Tích chương, rồi tích/bỏ từng bài trong chương ({scopeLessons.filter((l) => selectedChapters.includes(baseChapter(l.name)) && !excludedLessons.includes(l.name)).length} bài đang chọn)</strong><div className="filters"><button type="button" onClick={() => { setSelectedChapters(scopeChapters.map((c) => c.name)); setExcludedLessons([]); }}>Chọn tất cả chương và bài</button><button type="button" onClick={() => { setSelectedChapters([]); setExcludedLessons([]); }}>Bỏ chọn</button></div>{scopeChapters.length === 0 && <span className="muted">Đang tải danh sách chương…</span>}{scopeChapters.map((c) => { const chapterLessons = scopeLessons.filter((l) => baseChapter(l.name) === c.name); const chapterOn = selectedChapters.includes(c.name); return (<div key={c.name} className="scope-chapter"><label><input type="checkbox" checked={chapterOn} onChange={(e) => setSelectedChapters(e.target.checked ? [...selectedChapters, c.name] : selectedChapters.filter((x) => x !== c.name))} /> <strong>{c.name}</strong> ({c.count} câu)</label>{chapterOn && <div className="scope-lessons">{chapterLessons.map((l) => <label key={l.name}><input type="checkbox" checked={!excludedLessons.includes(l.name)} onChange={(e) => setExcludedLessons(e.target.checked ? excludedLessons.filter((x) => x !== l.name) : [...excludedLessons, l.name])} /> {lessonTitle(l.name) || l.name} ({l.count} câu)</label>)}</div>}</div>); })}</div>}
@@ -2279,9 +2394,9 @@ export default function App() {
           <h3>Số câu theo mức</h3>
           <div className="filters">{LEVELS.map((l) => <label key={l}>{l}<input type="number" min={0} value={levelNeed[l]} onChange={(e) => setLevelNeed({ ...levelNeed, [l]: Math.max(0, Number(e.target.value)) })} /></label>)}</div>
           <h3>Số câu theo phần</h3>
-          <div className="filters">{QTYPES.map((q) => <label key={q}>{QTYPE_LABEL[q]}<input type="number" min={0} value={partNeed[q]} onChange={(e) => setPartNeed({ ...partNeed, [q]: Math.max(0, Number(e.target.value)) })} /></label>)}</div>
+          <div className="filters">{QTYPES.map((q) => <label key={q}>{partLabelOf(q)}<input type="number" min={0} value={partNeed[q]} onChange={(e) => setPartNeed({ ...partNeed, [q]: Math.max(0, Number(e.target.value)) })} /></label>)}</div>
           <h3>Điểm theo phần</h3>
-          <div className="filters">{QTYPES.map((q) => <label key={q}>{QTYPE_LABEL[q]}<input type="number" min={0} step="0.25" value={partPoints[q]} onChange={(e) => setPartPoints({ ...partPoints, [q]: Math.max(0, Number(e.target.value)) })} /><span className="muted">{partNeed[q] > 0 ? `${fmtPoints(partPoints[q] / partNeed[q])} đ/câu` : '—'}</span></label>)}</div>
+          <div className="filters">{QTYPES.map((q) => <label key={q}>{partLabelOf(q)}<input type="number" min={0} step="0.25" value={partPoints[q]} onChange={(e) => setPartPoints({ ...partPoints, [q]: Math.max(0, Number(e.target.value)) })} /><span className="muted">{partNeed[q] > 0 ? `${fmtPts(partPoints[q] / partNeed[q], en)} ${en ? 'pts/question' : 'đ/câu'}` : '—'}</span></label>)}</div>
           <p className="muted">Tổng điểm đề: {fmtPoints(QTYPES.reduce((s, q) => s + (partNeed[q] > 0 ? partPoints[q] : 0), 0))} điểm. Điểm mỗi câu bằng điểm của phần chia cho số câu của phần đó. Tổng theo mức phải bằng tổng theo phần; thiếu câu sẽ báo rõ.</p>
           {(() => {
             const cap = {} as Record<Level, Record<QType, number>>;
@@ -2300,9 +2415,9 @@ export default function App() {
             const vdPts = ptsByLevel(['VD']);
             const vdcPts = ptsByLevel(['VDC']);
             const compRows = [
-              { label: 'Tư duy & lập luận toán học', pts: nbPts + thPts / 2 },
-              { label: 'Giải quyết vấn đề toán học', pts: thPts / 2 + vdPts },
-              { label: 'Mô hình hóa toán học', pts: vdcPts },
+              { label: en ? 'Mathematical reasoning' : 'Tư duy & lập luận toán học', pts: nbPts + thPts / 2 },
+              { label: en ? 'Mathematical problem solving' : 'Giải quyết vấn đề toán học', pts: thPts / 2 + vdPts },
+              { label: en ? 'Mathematical modeling' : 'Mô hình hóa toán học', pts: vdcPts },
             ];
             const compCounts = distributeByWeights(totalQ, compRows.map((r) => r.pts));
             const tnkqPts = (partNeed.single > 0 ? partPoints.single : 0) + (partNeed.tf > 0 ? partPoints.tf : 0) + (partNeed.short > 0 ? partPoints.short : 0);
@@ -2311,42 +2426,42 @@ export default function App() {
             const totalPeriods = scopeList.reduce((a, l) => a + (lessonPeriods[lessonTitle(l.name) || l.name] ?? 1), 0);
             return (
               <section className="ratio-panel">
-                <h3>Tỉ lệ & phân bổ điểm</h3>
+                <h3>{en ? 'Ratios & score allocation' : 'Tỉ lệ & phân bổ điểm'}</h3>
                 <div className="ratio-grid">
                   <div className="ratio-card">
-                    <h4>Biết – Hiểu – Vận dụng (theo điểm)</h4>
+                    <h4>{en ? 'Knowing – Understanding – Applying (by score)' : 'Biết – Hiểu – Vận dụng (theo điểm)'}</h4>
                     {bhv.map((r) => (
                       <div className="ratio-row" key={r.label}>
                         <span>{r.label}</span>
                         <span className="ratio-bar"><span style={{ width: `${totalPts > 0 ? Math.min(100, (r.pts / totalPts) * 100) : 0}%` }} /></span>
                         <strong>{totalPts > 0 ? `${((r.pts / totalPts) * 100).toFixed(1).replace('.', ',')}%` : '—'}</strong>
-                        <small>mục tiêu {r.target}%</small>
+                        <small>{en ? 'target' : 'mục tiêu'} {r.target}%</small>
                       </div>
                     ))}
                     <p className="muted">Theo Công văn 7991/BGDĐT-GDTrH: Nhận biết khoảng 40% – Thông hiểu khoảng 30% – Vận dụng khoảng 30% điểm; trắc nghiệm khách quan {totalPts > 0 ? `${((tnkqPts / totalPts) * 100).toFixed(0)}%` : '—'} – Tự luận {totalPts > 0 ? `${(((totalPts - tnkqPts) / totalPts) * 100).toFixed(0)}%` : '—'} (chuẩn 70% – 30%).</p>
                   </div>
                   <div className="ratio-card">
-                    <h4>Tỉ lệ năng lực toán học (tự tính)</h4>
+                    <h4>{en ? 'Mathematical competency ratios (auto)' : 'Tỉ lệ năng lực toán học (tự tính)'}</h4>
                     {compRows.map((r, i) => (
                       <div className="ratio-row" key={r.label}>
                         <span>{r.label}</span>
                         <strong>{totalPts > 0 ? `${((r.pts / totalPts) * 100).toFixed(1).replace('.', ',')}%` : '—'}</strong>
-                        <small>{compCounts[i]} câu · {fmtPoints(r.pts)} điểm</small>
+                        <small>{compCounts[i]} {en ? 'questions' : 'câu'} · {fmtPts(r.pts, en)} {en ? 'points' : 'điểm'}</small>
                       </div>
                     ))}
                     <p className="muted">Tự tính từ mức độ của ma trận: Nhận biết và một nửa Thông hiểu → Tư duy & lập luận; một nửa Thông hiểu và Vận dụng → Giải quyết vấn đề; Vận dụng cao → Mô hình hóa.</p>
                   </div>
                   <div className="ratio-card">
-                    <h4>Điểm theo số tiết học</h4>
+                    <h4>{en ? 'Score by teaching periods' : 'Điểm theo số tiết học'}</h4>
                     <p>Tổng số tiết phạm vi: <strong>{totalPeriods || '—'}</strong> · Điểm/tiết: <strong>{totalPeriods > 0 ? fmtPoints(totalPts / totalPeriods) : '—'}</strong> · Câu/tiết: <strong>{totalPeriods > 0 ? (totalQ / totalPeriods).toFixed(2).replace('.', ',') : '—'}</strong></p>
                     <p className="muted">App tự tính % điểm từng bài = số tiết của bài ÷ tổng số tiết × tổng điểm, rồi phân bổ câu/điểm vào ma trận theo tỉ lệ đó. Thầy chỉ cần đúng số tiết theo phân phối chương trình của trường.</p>
                   </div>
                 </div>
                 {scopeList.length > 0 ? (
                   <div className="period-list">
-                    <strong>Số tiết theo bài</strong>
+                    <strong>{en ? 'Periods by lesson' : 'Số tiết theo bài'}</strong>
                     {scopeList.map((l) => (
-                      <label key={l.name}><span>{lessonTitle(l.name) || l.name}</span><input type="number" min={0} step="0.5" value={lessonPeriods[lessonTitle(l.name) || l.name] ?? 1} onChange={(e) => setLessonPeriods({ ...lessonPeriods, [lessonTitle(l.name) || l.name]: Math.max(0, Number(e.target.value)) })} aria-label={`Số tiết ${l.name}`} /></label>
+                      <label key={l.name}><span>{en ? lessonEnName(l.name) : (lessonTitle(l.name) || l.name)}</span><input type="number" min={0} step="0.5" value={lessonPeriods[lessonTitle(l.name) || l.name] ?? 1} onChange={(e) => setLessonPeriods({ ...lessonPeriods, [lessonTitle(l.name) || l.name]: Math.max(0, Number(e.target.value)) })} aria-label={`Số tiết ${l.name}`} /></label>
                     ))}
                   </div>
                 ) : <p className="muted">Chọn phạm vi theo chương/bài hoặc chờ tải danh sách bài để nhập số tiết từng bài.</p>}
@@ -2356,37 +2471,37 @@ export default function App() {
           <button className="primary" onClick={() => void generateExam()}>Sinh mã đề</button>
           {examLang === 'en' && <p className="muted">Đề tiếng Anh lấy từ kho Toán tiếng Anh theo đúng ma trận mức × phần; thầy in hoặc xuất file trực tiếp ở mục In đề.</p>}
           {(() => { const cap = {} as Record<Level, Record<QType, number>>; for (const l of LEVELS) { cap[l] = {} as Record<QType, number>; for (const q of QTYPES) cap[l][q] = 999; } const cells = standardCells(levelNeed, partNeed, partPoints) ?? buildCellCounts(levelNeed, partNeed, cap);
-            const groups: { key: string; label: string; levels: Level[] }[] = [{ key: 'B', label: 'Biết', levels: ['NB'] }, { key: 'H', label: 'Hiểu', levels: ['TH'] }, { key: 'VD', label: 'VD', levels: ['VD', 'VDC'] }];
-            const partGroup: Record<QType, string> = { single: 'TNKQ nhiều lựa chọn', tf: 'TNKQ đúng - sai', short: 'TNKQ trả lời ngắn', essay: 'Tự luận' };
-            const codeOf: Record<QType, string> = { single: 'TNNLC', tf: 'TNĐS', short: 'TLN', essay: 'TL' };
-            const yeuCau: Record<string, string> = { B: 'Nhận biết: nhận biết được các khái niệm, định nghĩa, tính chất cơ bản của nội dung.', H: 'Thông hiểu: hiểu và áp dụng trực tiếp kiến thức, tính chất vào bài toán quen thuộc.', VD: 'Vận dụng: vận dụng kiến thức để giải quyết bài toán, kể cả bài toán thực tiễn.' };
+            const groups: { key: string; label: string; levels: Level[] }[] = [{ key: 'B', label: en ? 'Knowing' : 'Biết', levels: ['NB'] }, { key: 'H', label: en ? 'Understanding' : 'Hiểu', levels: ['TH'] }, { key: 'VD', label: en ? 'Applying' : 'VD', levels: ['VD', 'VDC'] }];
+            const partGroup: Record<QType, string> = en ? { single: 'Multiple choice', tf: 'True/False', short: 'Short answer', essay: 'Free response' } : { single: 'TNKQ nhiều lựa chọn', tf: 'TNKQ đúng - sai', short: 'TNKQ trả lời ngắn', essay: 'Tự luận' };
+            const codeOf: Record<QType, string> = en ? { single: 'MC', tf: 'TF', short: 'SA', essay: 'FR' } : { single: 'TNNLC', tf: 'TNĐS', short: 'TLN', essay: 'TL' };
+            const yeuCau: Record<string, string> = en ? { B: 'Knowing: recognize the basic concepts, definitions and properties of the content.', H: 'Understanding: understand and directly apply knowledge and properties to familiar problems.', VD: 'Applying: apply knowledge to solve problems, including real-life problems.' } : { B: 'Nhận biết: nhận biết được các khái niệm, định nghĩa, tính chất cơ bản của nội dung.', H: 'Thông hiểu: hiểu và áp dụng trực tiếp kiến thức, tính chất vào bài toán quen thuộc.', VD: 'Vận dụng: vận dụng kiến thức để giải quyết bài toán, kể cả bài toán thực tiễn.' };
             const lessonsAll = scopeLessons.filter((l) => scopeMode === 'all' || (scopeMode === 'chapter' ? (selectedChapters.includes(baseChapter(l.name)) && !excludedLessons.includes(l.name)) : selectedLessons.includes(l.name)));
             const lessons = lessonsAll.length ? lessonsAll : [{ name: lessonTitle(mLesson) || `Toàn khối ${mGrade}`, count: 0 }];
             const dist: Record<string, number>[] = lessons.map(() => ({}));
             if (cells) { const weights = lessons.map((l) => lessonPeriods[lessonTitle(l.name) || l.name] ?? 1); for (const q of QTYPES) { for (const g of groups) { const total = g.levels.reduce((a, l) => a + cells[l][q], 0); const alloc = distributeByWeights(total, weights); alloc.forEach((v, idx) => { if (v > 0) dist[idx][`${q}|${g.key}`] = v; }); } } }
             const ptsOf = (i: number, q: QType, gk: string) => (partNeed[q] > 0 ? (dist[i][`${q}|${gk}`] ?? 0) * (partPoints[q] / partNeed[q]) : 0);
             const totalPts = QTYPES.reduce((a, q) => a + (partNeed[q] > 0 ? partPoints[q] : 0), 0);
-            const pct = (v: number) => `${(totalPts > 0 ? (v / totalPts) * 100 : 0).toFixed(1).replace('.', ',')}%`;
+            const pct = (v: number) => `${(totalPts > 0 ? (v / totalPts) * 100 : 0).toFixed(1).replace('.', en ? '.' : ',')}%`;
             const chapters: { name: string; idx: number[] }[] = [];
             lessons.forEach((l, i) => { const ch = baseChapter(l.name) || l.name; const f = chapters.find((c) => c.name === ch); if (f) f.idx.push(i); else chapters.push({ name: ch, idx: [i] }); });
             return (<>
-            <h3>Ma trận đề</h3>
+            <h3>{en ? 'Exam matrix' : 'Ma trận đề'}</h3>
             <div style={{ overflowX: 'auto' }}><table><thead>
-              <tr><th rowSpan={3}>TT</th><th rowSpan={3}>Chương/chủ đề</th><th rowSpan={3}>Nội dung/đơn vị kiến thức</th><th colSpan={12}>Mức độ đánh giá</th><th colSpan={3}>Tổng</th><th rowSpan={3}>Tỉ lệ % điểm</th></tr>
+              <tr><th rowSpan={3}>{en ? 'No.' : 'TT'}</th><th rowSpan={3}>{en ? 'Chapter/Topic' : 'Chương/chủ đề'}</th><th rowSpan={3}>{en ? 'Content/Unit' : 'Nội dung/đơn vị kiến thức'}</th><th colSpan={12}>{en ? 'Assessment level' : 'Mức độ đánh giá'}</th><th colSpan={3}>{en ? 'Total' : 'Tổng'}</th><th rowSpan={3}>{en ? 'Score %' : 'Tỉ lệ % điểm'}</th></tr>
               <tr>{QTYPES.map((q) => <th key={q} colSpan={3}>{partGroup[q]}</th>)}<th colSpan={3}></th></tr>
               <tr>{QTYPES.flatMap((q) => groups.map((g) => <th key={`${q}${g.key}`}>{g.label}</th>))}{groups.map((g) => <th key={g.key}>{g.label}</th>)}</tr>
             </thead><tbody>
-              {chapters.map((ch, ci) => ch.idx.map((i, ri) => { const lp = QTYPES.reduce((a, q) => a + groups.reduce((b, g) => b + ptsOf(i, q, g.key), 0), 0); return (<tr key={i}>{ri === 0 && <td rowSpan={ch.idx.length}>{ci + 1}</td>}{ri === 0 && <td rowSpan={ch.idx.length}>{ch.name}</td>}<td>{lessonTitle(lessons[i].name) || lessons[i].name}</td>{QTYPES.flatMap((q) => groups.map((g) => <td key={`${q}${g.key}`}>{dist[i][`${q}|${g.key}`] || ''}</td>))}{groups.map((g) => <td key={g.key}><strong>{QTYPES.reduce((a, q) => a + (dist[i][`${q}|${g.key}`] ?? 0), 0) || ''}</strong></td>)}<td>{pct(lp)}</td></tr>); }))}
-              <tr><td colSpan={3}><strong>Tổng số câu</strong></td>{QTYPES.flatMap((q) => groups.map((g) => <td key={`${q}${g.key}`}>{cells ? g.levels.reduce((a, l) => a + cells[l][q], 0) : 0}</td>))}{groups.map((g) => <td key={g.key}><strong>{g.levels.reduce((a, l) => a + levelNeed[l], 0)}</strong></td>)}<td><strong>100%</strong></td></tr>
-              <tr><td colSpan={3}><strong>Tổng số điểm</strong></td>{QTYPES.map((q) => <td key={q} colSpan={3}>{fmtPoints(partPoints[q])}</td>)}{groups.map((g) => <td key={g.key}>{fmtPoints(QTYPES.reduce((a, q) => a + (partNeed[q] > 0 && cells ? g.levels.reduce((b, l) => b + cells[l][q], 0) * (partPoints[q] / partNeed[q]) : 0), 0))}</td>)}<td>{fmtPoints(totalPts)}</td></tr>
-              <tr><td colSpan={3}><strong>Tỉ lệ %</strong></td>{QTYPES.map((q) => <td key={q} colSpan={3}>{pct(partPoints[q])}</td>)}{groups.map((g) => <td key={g.key}>{pct(QTYPES.reduce((a, q) => a + (partNeed[q] > 0 && cells ? g.levels.reduce((b, l) => b + cells[l][q], 0) * (partPoints[q] / partNeed[q]) : 0), 0))}</td>)}<td>100%</td></tr>
+              {chapters.map((ch, ci) => ch.idx.map((i, ri) => { const lp = QTYPES.reduce((a, q) => a + groups.reduce((b, g) => b + ptsOf(i, q, g.key), 0), 0); return (<tr key={i}>{ri === 0 && <td rowSpan={ch.idx.length}>{ci + 1}</td>}{ri === 0 && <td rowSpan={ch.idx.length}>{en ? lessonEnName(ch.name) : ch.name}</td>}<td>{en ? lessonEnName(lessons[i].name) : (lessonTitle(lessons[i].name) || lessons[i].name)}</td>{QTYPES.flatMap((q) => groups.map((g) => <td key={`${q}${g.key}`}>{dist[i][`${q}|${g.key}`] || ''}</td>))}{groups.map((g) => <td key={g.key}><strong>{QTYPES.reduce((a, q) => a + (dist[i][`${q}|${g.key}`] ?? 0), 0) || ''}</strong></td>)}<td>{pct(lp)}</td></tr>); }))}
+              <tr><td colSpan={3}><strong>{en ? 'Total questions' : 'Tổng số câu'}</strong></td>{QTYPES.flatMap((q) => groups.map((g) => <td key={`${q}${g.key}`}>{cells ? g.levels.reduce((a, l) => a + cells[l][q], 0) : 0}</td>))}{groups.map((g) => <td key={g.key}><strong>{g.levels.reduce((a, l) => a + levelNeed[l], 0)}</strong></td>)}<td><strong>100%</strong></td></tr>
+              <tr><td colSpan={3}><strong>{en ? 'Total score' : 'Tổng số điểm'}</strong></td>{QTYPES.map((q) => <td key={q} colSpan={3}>{fmtPts(partPoints[q], en)}</td>)}{groups.map((g) => <td key={g.key}>{fmtPts(QTYPES.reduce((a, q) => a + (partNeed[q] > 0 && cells ? g.levels.reduce((b, l) => b + cells[l][q], 0) * (partPoints[q] / partNeed[q]) : 0), 0), en)}</td>)}<td>{fmtPts(totalPts, en)}</td></tr>
+              <tr><td colSpan={3}><strong>{en ? 'Percentage' : 'Tỉ lệ %'}</strong></td>{QTYPES.map((q) => <td key={q} colSpan={3}>{pct(partPoints[q])}</td>)}{groups.map((g) => <td key={g.key}>{pct(QTYPES.reduce((a, q) => a + (partNeed[q] > 0 && cells ? g.levels.reduce((b, l) => b + cells[l][q], 0) * (partPoints[q] / partNeed[q]) : 0), 0))}</td>)}<td>100%</td></tr>
             </tbody></table></div>
-            <h3>Bảng đặc tả</h3>
+            <h3>{en ? 'Exam specification' : 'Bảng đặc tả'}</h3>
             <div style={{ overflowX: 'auto' }}><table><thead>
-              <tr><th rowSpan={2}>STT</th><th rowSpan={2}>Chương/chủ đề</th><th rowSpan={2}>Nội dung</th><th rowSpan={2}>Mức độ kiểm tra, đánh giá</th><th colSpan={3}>Số câu hỏi theo mức độ nhận thức</th></tr>
-              <tr><th>Nhận biết</th><th>Thông hiểu</th><th>Vận dụng</th></tr>
+              <tr><th rowSpan={2}>{en ? 'No.' : 'STT'}</th><th rowSpan={2}>{en ? 'Chapter/Topic' : 'Chương/chủ đề'}</th><th rowSpan={2}>{en ? 'Content' : 'Nội dung'}</th><th rowSpan={2}>{en ? 'Assessment level' : 'Mức độ kiểm tra, đánh giá'}</th><th colSpan={3}>{en ? 'Questions by cognitive level' : 'Số câu hỏi theo mức độ nhận thức'}</th></tr>
+              <tr><th>{en ? 'Knowing' : 'Nhận biết'}</th><th>{en ? 'Understanding' : 'Thông hiểu'}</th><th>{en ? 'Applying' : 'Vận dụng'}</th></tr>
             </thead><tbody>
-              {chapters.map((ch, ci) => ch.idx.map((i, ri) => (<tr key={i}>{ri === 0 && <td rowSpan={ch.idx.length}>{ci + 1}</td>}{ri === 0 && <td rowSpan={ch.idx.length}>{ch.name}</td>}<td>{lessonTitle(lessons[i].name) || lessons[i].name}</td><td>{groups.filter((g) => QTYPES.some((q) => (dist[i][`${q}|${g.key}`] ?? 0) > 0)).map((g) => yeuCau[g.key]).join(' ')}</td>{groups.map((g) => <td key={g.key}>{QTYPES.filter((q) => (dist[i][`${q}|${g.key}`] ?? 0) > 0).map((q) => `${dist[i][`${q}|${g.key}`]}${codeOf[q]}`).join(' ')}</td>)}</tr>)))}
+              {chapters.map((ch, ci) => ch.idx.map((i, ri) => (<tr key={i}>{ri === 0 && <td rowSpan={ch.idx.length}>{ci + 1}</td>}{ri === 0 && <td rowSpan={ch.idx.length}>{en ? lessonEnName(ch.name) : ch.name}</td>}<td>{en ? lessonEnName(lessons[i].name) : (lessonTitle(lessons[i].name) || lessons[i].name)}</td><td>{groups.filter((g) => QTYPES.some((q) => (dist[i][`${q}|${g.key}`] ?? 0) > 0)).map((g) => yeuCau[g.key]).join(' ')}</td>{groups.map((g) => <td key={g.key}>{QTYPES.filter((q) => (dist[i][`${q}|${g.key}`] ?? 0) > 0).map((q) => `${dist[i][`${q}|${g.key}`]}${codeOf[q]}`).join(' ')}</td>)}</tr>)))}
             </tbody></table></div>
           </>); })()}
           <div className="filters">
@@ -2406,15 +2521,15 @@ export default function App() {
           {matrixMsg && <p className="notice">{matrixMsg}</p>}
           {generated.length > 0 && (
             <section className="card answer-key">
-              <h3>Đáp án ở cuối đề</h3>
+              <h3>{en ? 'Answer key' : 'Đáp án ở cuối đề'}</h3>
               <p className="muted">Kiểm tra nhanh đáp án ngay sau khi sinh đề để không bị sót trước khi lưu/giao bài. File đề cho học sinh vẫn tách riêng; file đáp án xuất riêng kèm lời giải.</p>
               {generated.map((code) => (
                 <article className="question" key={code.code}>
-                  <p><strong>Mã đề {String(code.code).padStart(2, '0')}</strong></p>
+                  <p><strong>{en ? 'Code' : 'Mã đề'} {String(code.code).padStart(2, '0')}</strong></p>
                   {QTYPES.map((qt) => {
                     const qs = code.questions.filter((q) => q.qtype === qt);
                     if (!qs.length) return null;
-                    return <p key={qt}><strong>{QTYPE_LABEL[qt]}:</strong> {qs.map((q, i) => <span key={q.id}>Câu {i + 1}: <MathText text={q.correct} />{i < qs.length - 1 ? ' · ' : ''}</span>)}</p>;
+                    return <p key={qt}><strong>{partLabelOf(qt)}:</strong> {qs.map((q, i) => <span key={q.id}>{en ? 'Question' : 'Câu'} {i + 1}: <MathText text={q.correct} />{i < qs.length - 1 ? ' · ' : ''}</span>)}</p>;
                   })}
                 </article>
               ))}
@@ -2460,9 +2575,9 @@ export default function App() {
           </section>
           {createdExam && createdCodes.length > 0 && (() => {
             const code = createdCodes[Math.min(createdCodeIdx, createdCodes.length - 1)];
-            const bhvOf = (l: Level) => (l === 'NB' ? 'Biết' : l === 'TH' ? 'Hiểu' : 'VD');
-            const partLabel: Record<QType, string> = { single: 'TN nhiều lựa chọn', tf: 'TN đúng - sai', short: 'TN trả lời ngắn', essay: 'Tự luận' };
-            const partCode: Record<QType, string> = { single: 'TNNLC', tf: 'TNĐS', short: 'TLN', essay: 'TL' };
+            const bhvOf = (l: Level) => (en ? (l === 'NB' ? 'Knowing' : l === 'TH' ? 'Understanding' : 'Applying') : (l === 'NB' ? 'Biết' : l === 'TH' ? 'Hiểu' : 'VD'));
+            const partLabel: Record<QType, string> = en ? { single: 'Multiple choice', tf: 'True/False', short: 'Short answer', essay: 'Free response' } : { single: 'TN nhiều lựa chọn', tf: 'TN đúng - sai', short: 'TN trả lời ngắn', essay: 'Tự luận' };
+            const partCode: Record<QType, string> = en ? { single: 'MC', tf: 'TF', short: 'SA', essay: 'FR' } : { single: 'TNNLC', tf: 'TNĐS', short: 'TLN', essay: 'TL' };
             const rowsMap = new Map<string, { chapter: string; lesson: string; qs: Question[] }>();
             for (const q of code.questions) {
               const lesson = (q.lesson ?? '').trim() || lessonTitle(q.chapter) || q.chapter;
@@ -2479,17 +2594,17 @@ export default function App() {
               return a.lesson.localeCompare(b.lesson, 'vi');
             });
             const totalPts = code.questions.reduce((a, q) => a + Number(q.points || 0), 0);
-            const cnt = (qs: Question[], part: QType, g: string) => qs.filter((q) => q.qtype === part && bhvOf(q.level) === g).length;
+            const cnt = (qs: Question[], part: QType, g: string) => qs.filter((q) => q.qtype === part && bhvOf(q.level) === (en ? ({ 'Biết': 'Knowing', 'Hiểu': 'Understanding', 'VD': 'Applying' } as Record<string, string>)[g] : g)).length;
             const pts = (qs: Question[]) => qs.reduce((a, q) => a + Number(q.points || 0), 0);
             return (
               <>
                 <section className="card">
-                  <h3>{createdExam.title} — Lớp {createdExam.grade}</h3>
+                  <h3>{createdExam.title} — {en ? `Grade ${createdExam.grade}` : `Lớp ${createdExam.grade}`}</h3>
                   <div className="filters">
-                    {createdCodes.map((c, i) => <button key={c.code} className={i === createdCodeIdx ? 'primary' : ''} onClick={() => setCreatedCodeIdx(i)}>Mã đề {String(c.code).padStart(2, '0')}</button>)}
+                    {createdCodes.map((c, i) => <button key={c.code} className={i === createdCodeIdx ? 'primary' : ''} onClick={() => setCreatedCodeIdx(i)}>{en ? 'Code' : 'Mã đề'} {String(c.code).padStart(2, '0')}</button>)}
                     <button onClick={() => setTab('print')}>In đề / Xuất file</button>
                   </div>
-                  <h4>Xem nhanh đề — Mã {String(code.code).padStart(2, '0')}</h4>
+                  <h4>{en ? `Quick view — Code ${String(code.code).padStart(2, '0')}` : `Xem nhanh đề — Mã ${String(code.code).padStart(2, '0')}`}</h4>
                   {QTYPES.map((qt) => {
                     const qs = code.questions.filter((q) => q.qtype === qt);
                     if (!qs.length) return null;
@@ -2498,7 +2613,7 @@ export default function App() {
                         <h5>{partLabel[qt]}</h5>
                         {qs.map((q, i) => (
                           <article className="question" key={q.id}>
-                            <p><strong>Câu {i + 1}.</strong> <MathText text={stripSourcePrefix(q.content)} /></p>
+                            <p><strong>{en ? 'Question' : 'Câu'} {i + 1}.</strong> <MathText text={stripSourcePrefix(q.content)} /></p>
                             {q.image_url && <img className="figure" src={q.image_url} alt="Hình minh họa" />}
                             {q.options?.length > 0 && <div className={`options-grid cols-${optionLayout(q.options)}`}>{q.options.map((op, oi) => <span key={oi}><strong>{'ABCD'[oi] ?? oi + 1}.</strong> <MathText text={stripOptionPrefix(op)} /></span>)}</div>}
                           </article>
@@ -2506,35 +2621,35 @@ export default function App() {
                       </div>
                     );
                   })}
-                  <h4>Ma trận đề (Mã {String(code.code).padStart(2, '0')})</h4>
+                  <h4>{en ? `Exam matrix (Code ${String(code.code).padStart(2, '0')})` : `Ma trận đề (Mã ${String(code.code).padStart(2, '0')})`}</h4>
                   <div className="tablewrap"><table className="matrix-table">
-                    <thead><tr><th>TT</th><th>Chương/chủ đề</th><th>Nội dung/đơn vị kiến thức</th>{QTYPES.map((p) => <th key={p} colSpan={3}>{partLabel[p]}</th>)}<th>Tổng điểm</th><th>Tỉ lệ %</th></tr>
-                    <tr><th colSpan={3}></th>{QTYPES.map((p) => <Fragment key={p}><th>Biết</th><th>Hiểu</th><th>VD</th></Fragment>)}<th></th><th></th></tr></thead>
+                    <thead><tr><th>{en ? 'No.' : 'TT'}</th><th>{en ? 'Chapter/Topic' : 'Chương/chủ đề'}</th><th>{en ? 'Content/Unit' : 'Nội dung/đơn vị kiến thức'}</th>{QTYPES.map((p) => <th key={p} colSpan={3}>{partLabel[p]}</th>)}<th>{en ? 'Score' : 'Tổng điểm'}</th><th>{en ? '%' : 'Tỉ lệ %'}</th></tr>
+                    <tr><th colSpan={3}></th>{QTYPES.map((p) => <Fragment key={p}><th>{en ? 'Knowing' : 'Biết'}</th><th>{en ? 'Understanding' : 'Hiểu'}</th><th>{en ? 'Applying' : 'VD'}</th></Fragment>)}<th></th><th></th></tr></thead>
                     <tbody>
                       {rows.map((r, i) => (
-                        <tr key={r.lesson}><td>{i + 1}</td><td>{r.chapter}</td><td>{r.lesson}</td>
+                        <tr key={r.lesson}><td>{i + 1}</td><td>{en ? lessonEnName(r.lesson) : r.chapter}</td><td>{en ? lessonEnName(r.lesson) : r.lesson}</td>
                           {QTYPES.map((p) => <Fragment key={p}><td>{cnt(r.qs, p, 'Biết') || ''}</td><td>{cnt(r.qs, p, 'Hiểu') || ''}</td><td>{cnt(r.qs, p, 'VD') || ''}</td></Fragment>)}
-                          <td>{fmtPoints(pts(r.qs))}</td><td>{totalPts > 0 ? `${((pts(r.qs) / totalPts) * 100).toFixed(1).replace('.', ',')}%` : ''}</td></tr>
+                          <td>{fmtPts(pts(r.qs), en)}</td><td>{totalPts > 0 ? `${((pts(r.qs) / totalPts) * 100).toFixed(1).replace('.', en ? '.' : ',')}%` : ''}</td></tr>
                       ))}
-                      <tr><td colSpan={3}><strong>Tổng số câu</strong></td>{QTYPES.map((p) => <Fragment key={p}><td>{cnt(code.questions, p, 'Biết') || ''}</td><td>{cnt(code.questions, p, 'Hiểu') || ''}</td><td>{cnt(code.questions, p, 'VD') || ''}</td></Fragment>)}<td><strong>{fmtPoints(totalPts)}</strong></td><td><strong>100%</strong></td></tr>
+                      <tr><td colSpan={3}><strong>{en ? 'Total questions' : 'Tổng số câu'}</strong></td>{QTYPES.map((p) => <Fragment key={p}><td>{cnt(code.questions, p, 'Biết') || ''}</td><td>{cnt(code.questions, p, 'Hiểu') || ''}</td><td>{cnt(code.questions, p, 'VD') || ''}</td></Fragment>)}<td><strong>{fmtPts(totalPts, en)}</strong></td><td><strong>100%</strong></td></tr>
                     </tbody>
                   </table></div>
-                  <h4>Bảng đặc tả</h4>
+                  <h4>{en ? 'Exam specification' : 'Bảng đặc tả'}</h4>
                   <div className="tablewrap"><table className="matrix-table">
-                    <thead><tr><th>STT</th><th>Chương/chủ đề</th><th>Nội dung/đơn vị kiến thức</th><th>Mức độ kiểm tra, đánh giá</th><th>Số câu hỏi theo mức độ nhận thức</th></tr></thead>
+                    <thead><tr><th>{en ? 'No.' : 'STT'}</th><th>{en ? 'Chapter/Topic' : 'Chương/chủ đề'}</th><th>{en ? 'Content/Unit' : 'Nội dung/đơn vị kiến thức'}</th><th>{en ? 'Assessment level' : 'Mức độ kiểm tra, đánh giá'}</th><th>{en ? 'Questions by cognitive level' : 'Số câu hỏi theo mức độ nhận thức'}</th></tr></thead>
                     <tbody>
                       {rows.map((r, i) => (
-                        <tr key={r.lesson}><td>{i + 1}</td><td>{r.chapter}</td><td>{r.lesson}</td>
+                        <tr key={r.lesson}><td>{i + 1}</td><td>{en ? lessonEnName(r.lesson) : r.chapter}</td><td>{en ? lessonEnName(r.lesson) : r.lesson}</td>
                           <td>{[...new Set(r.qs.map((q) => `${q.dang} (${bhvOf(q.level)})`))].join('; ')}</td>
-                          <td>{QTYPES.flatMap((p) => ['Biết', 'Hiểu', 'VD'].map((g) => { const n = cnt(r.qs, p, g); return n ? `${n}${partCode[p]}-${g}` : ''; })).filter(Boolean).join(', ')}</td></tr>
+                          <td>{QTYPES.flatMap((p) => ['Biết', 'Hiểu', 'VD'].map((g) => { const n = cnt(r.qs, p, g); return n ? `${n}${partCode[p]}-${en ? ({ 'Biết': 'Knowing', 'Hiểu': 'Understanding', 'VD': 'Applying' } as Record<string, string>)[g] : g}` : ''; })).filter(Boolean).join(', ')}</td></tr>
                       ))}
                     </tbody>
                   </table></div>
                 </section>
                 <section className="card">
-                  <h3>Đáp án & lời giải — Mã đề {String(code.code).padStart(2, '0')}</h3>
+                  <h3>{en ? `Answers & solutions — Code ${String(code.code).padStart(2, '0')}` : `Đáp án & lời giải — Mã đề ${String(code.code).padStart(2, '0')}`}</h3>
                   <div className="tablewrap"><table className="matrix-table">
-                    <thead><tr><th>Câu</th><th>Phần</th><th>Mức</th><th>Đáp án</th><th>Lời giải</th></tr></thead>
+                    <thead><tr><th>{en ? 'Question' : 'Câu'}</th><th>{en ? 'Part' : 'Phần'}</th><th>{en ? 'Level' : 'Mức'}</th><th>{en ? 'Answer' : 'Đáp án'}</th><th>{en ? 'Solution' : 'Lời giải'}</th></tr></thead>
                     <tbody>
                       {code.questions.map((q, i) => (
                         <tr key={q.id}><td>{i + 1}</td><td>{partLabel[q.qtype]}</td><td>{q.level}</td><td><MathText text={q.correct || '—'} /></td><td><MathText text={q.explanation || '—'} /></td></tr>
@@ -2563,32 +2678,32 @@ export default function App() {
           {generated.length === 0 && <p className="muted">Chưa có mã đề. Hãy vào mục Tạo đề để sinh mã.</p>}
           {generated.map((code) => (
             <section className="exam" key={code.code}>
-              <h2>Đề Toán lớp {mGrade} — Mã đề {String(code.code).padStart(2, '0')}</h2>
-              <p className="meta">Thời gian: {duration} phút · Tổng điểm: {fmtPoints(code.rawPoints)} điểm · {examDateTime()}</p>
+              <h2>{en ? `Grade ${mGrade} Math Exam — Code ${String(code.code).padStart(2, '0')}` : `Đề Toán lớp ${mGrade} — Mã đề ${String(code.code).padStart(2, '0')}`}</h2>
+              <p className="meta">{en ? `Time: ${duration} minutes · Total score: ${fmtPts(code.rawPoints, true)} points · ${examDateTime(true)}` : `Thời gian: ${duration} phút · Tổng điểm: ${fmtPoints(code.rawPoints)} điểm · ${examDateTime()}`}</p>
               {QTYPES.map((qt) => {
                 const qs = code.questions.filter((q) => q.qtype === qt);
                 if (!qs.length) return null;
                 return (
                   <div key={qt}>
-                    <h3>{QTYPE_LABEL[qt]}</h3>
+                    <h3>{partLabelOf(qt)}</h3>
                     {qs.map((q, i) => (
                       <article className="question" key={q.id}>
-                        <p><strong>Câu {i + 1}.</strong> <MathText text={stripSourcePrefix(q.content)} /></p>
+                        <p><strong>{en ? 'Question' : 'Câu'} {i + 1}.</strong> <MathText text={stripSourcePrefix(q.content)} /></p>
                         {q.image_url && <img className="figure" src={q.image_url} alt="Hình minh họa" />}
                         {q.options?.length > 0 && <div className={`options-grid cols-${optionLayout(q.options)}`}>{q.options.map((op, oi) => <span key={oi}><strong>{'ABCD'[oi] ?? oi + 1}.</strong> <MathText text={stripOptionPrefix(op)} /></span>)}</div>}
-                        {showAnswers && <div className="answer"><p><strong>Đáp án:</strong> <MathText text={q.correct} /></p>{q.explanation && <p><strong>Lời giải:</strong> <MathText text={q.explanation} /></p>}</div>}
+                        {showAnswers && <div className="answer"><p><strong>{en ? 'Answer' : 'Đáp án'}:</strong> <MathText text={q.correct} /></p>{q.explanation && <p><strong>{en ? 'Solution' : 'Lời giải'}:</strong> <MathText text={q.explanation} /></p>}</div>}
                       </article>
                     ))}
                   </div>
                 );
               })}
               <div className="answer answer-key no-print">
-                <h3>Đáp án ở cuối đề — Mã đề {String(code.code).padStart(2, '0')}</h3>
-                <p className="muted">Phần này hiện trên màn hình để kiểm tra trước khi lưu/in; khi in đề cho học sinh sẽ không in kèm đáp án.</p>
+                <h3>{en ? `Answer key — Code ${String(code.code).padStart(2, '0')}` : `Đáp án ở cuối đề — Mã đề ${String(code.code).padStart(2, '0')}`}</h3>
+                <p className="muted">{en ? 'Shown on screen for checking before saving/printing; the student paper will not include the answers.' : 'Phần này hiện trên màn hình để kiểm tra trước khi lưu/in; khi in đề cho học sinh sẽ không in kèm đáp án.'}</p>
                 {QTYPES.map((qt) => {
                   const qs = code.questions.filter((q) => q.qtype === qt);
                   if (!qs.length) return null;
-                  return <p key={qt}><strong>{QTYPE_LABEL[qt]}:</strong> {qs.map((q, i) => <span key={q.id}>Câu {i + 1}: <MathText text={q.correct} />{i < qs.length - 1 ? ' · ' : ''}</span>)}</p>;
+                  return <p key={qt}><strong>{partLabelOf(qt)}:</strong> {qs.map((q, i) => <span key={q.id}>{en ? 'Question' : 'Câu'} {i + 1}: <MathText text={q.correct} />{i < qs.length - 1 ? ' · ' : ''}</span>)}</p>;
                 })}
               </div>
             </section>
