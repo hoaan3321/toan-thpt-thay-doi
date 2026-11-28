@@ -119,6 +119,7 @@ function normalizeTexText(input: string): string {
         .replace(/\\1(?=[A-Za-z])/g, '\\\\')
         .replace(/\\1(?=\^)/g, '\\\\x')
         .replace(/\\1(?=[+\-≤≥<>])/g, '\\\\x')
+        .replace(/\\1(?=\\(le|ge)\b)/g, '\\\\x')
         .replace(/\\1(?==)/g, () => `\\\\${vars[vi++] ?? 'y'}`)
         .replace(/\\1(?=[0-9])/g, '\\\\')
         .replace(/\\1/g, '\\\\');
