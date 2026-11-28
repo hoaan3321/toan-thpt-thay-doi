@@ -164,3 +164,63 @@ button.primary, button.active { background: #2563eb; border-color: #2563eb; }
 .game-card strong { display: block; font-size: 17px; margin: 6px 0 4px; }
 .game-card small { display: block; color: #334155; line-height: 1.35; }
 .game-3d-icon { display: block; font-size: 54px; filter: drop-shadow(0 14px 9px rgba(0,0,0,.38)); animation: game-float 1.8s ease-in-out infinite; }
+
+/* Mobile-first compact layout 2026-11-28 */
+html, body { max-width: 100%; overflow-x: hidden; }
+.app { width: 100%; }
+.compact-topbar { padding: 12px 14px; border-radius: 18px; }
+.header-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; }
+.brand-btn { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1 1 auto; text-align: left; background: transparent; border: 0; color: #fff; padding: 4px; }
+.brand-mark { flex: 0 0 auto; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 12px; background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.32); font-size: 24px; font-weight: 900; }
+.brand-text { min-width: 0; display: grid; gap: 1px; }
+.brand-text strong { font-size: 19px; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.brand-sub { color: #dbeafe; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.header-actions { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.header-clock .app-clock { margin-top: 0 !important; }
+.compact-install, .header-icon-btn { white-space: nowrap; border-radius: 999px; padding: 8px 11px; font-weight: 750; }
+.compact-install { margin-top: 0; }
+.header-icon-btn { background: rgba(255,255,255,.16); color: #fff; border: 1px solid rgba(255,255,255,.3); }
+.hamburger { width: 42px; padding-inline: 0; font-size: 20px; }
+.mobile-menu { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; margin-top: 12px; }
+.mobile-menu section { background: rgba(255,255,255,.13); border: 1px solid rgba(255,255,255,.25); border-radius: 16px; padding: 10px; min-width: 0; }
+.mobile-menu h3 { color: #fff; font-size: 15px; margin: 0 0 8px; }
+.mobile-menu button { display: block; width: 100%; min-width: 0; margin: 5px 0; text-align: left; white-space: normal; overflow-wrap: anywhere; background: rgba(255,255,255,.95); color: #1e3a8a; border: 0; font-weight: 650; }
+.mobile-menu button.active { background: #facc15; color: #713f12; }
+.mobile-menu button.hot { color: #dc2626; font-weight: 850; }
+.account-panel { margin-top: 12px; background: rgba(255,255,255,.96); color: #172033; border-radius: 16px; padding: 12px; }
+.account-info { display: grid; gap: 6px; min-width: 0; overflow-wrap: anywhere; }
+.account-form { margin: 0; }
+.quick-steps { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 6px; scrollbar-width: thin; }
+.quick-step { flex: 0 0 auto; white-space: nowrap; }
+.dash-groups, .stats-grid { grid-template-columns: repeat(4, minmax(0,1fr)); }
+.dash-card .filters { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); align-items: stretch; }
+.dash-card .filters button { min-width: 0; white-space: normal; overflow-wrap: anywhere; line-height: 1.25; }
+.card h2, .card h3 { font-size: 17px; }
+.card p, .card button, .card li { font-size: 14.5px; }
+@media (max-width: 1024px) {
+  .dash-groups { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .stats-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .mobile-menu { grid-template-columns: repeat(2, minmax(0,1fr)); }
+}
+@media (max-width: 720px) {
+  .app { padding: 10px 10px 90px; }
+  .compact-topbar { padding: 10px; border-radius: 16px; margin-bottom: 12px; }
+  .brand-mark { width: 36px; height: 36px; font-size: 21px; }
+  .brand-text strong { font-size: 16px; }
+  .brand-sub, .header-clock { display: none; }
+  .compact-install span { display: none; }
+  .compact-install { padding-inline: 10px; }
+  .header-icon-btn { padding: 8px 9px; font-size: 13px; }
+  .mobile-menu { grid-template-columns: 1fr; }
+  .dash-groups { grid-template-columns: 1fr; }
+  .stats-grid { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
+  .card, .exam { padding: 12px; border-radius: 16px; margin-bottom: 12px; }
+  .dash-hero h2 { font-size: 22px; }
+  .big { font-size: 30px; overflow-wrap: anywhere; }
+  .filters input, .filters select { min-width: 0; }
+}
+@media (max-width: 420px) {
+  .brand-text strong { max-width: 150px; }
+  .dash-card .filters { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .stats-grid .card p { font-size: 13.5px; }
+}

@@ -683,6 +683,8 @@ export default function App() {
   const [aiImage, setAiImage] = useState<{ mimeType: string; data: string; preview: string } | null>(null);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [showInstallHelp, setShowInstallHelp] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [showAccountMenu, setShowAccountMenu] = useState(false);
 
   const bankParams = useMemo(() => {
     const p = eqParams({ grade, lesson: bankLesson || undefined, level: level || undefined, qtype: qtype || undefined });
@@ -1710,6 +1712,12 @@ export default function App() {
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
+  function goTab(next: Tab) {
+    setTab(next);
+    setShowMobileMenu(false);
+    setShowAccountMenu(false);
+  }
+
   async function installApp() {
     if (installPrompt) {
       await installPrompt.prompt();
@@ -1763,20 +1771,47 @@ export default function App() {
 
   return (
     <div className="app">
-      <header className="topbar no-print">
-        <div>
-          <h1>Toán THPT Thầy Đôi</h1>
-          <p>Ngân hàng câu hỏi, lý thuyết, Toán tiếng Anh và ma trận đề Toán THPT</p>
-          <AppClock />
-          <button className="install-btn" onClick={() => void installApp()}>📲 Cài ứng dụng</button>
+      <header className="topbar compact-topbar no-print">
+        <div className="header-row">
+          <button className="brand-btn" onClick={() => goTab('overview')} aria-label="Về trang chủ Toán THPT Thầy Đôi">
+            <span className="brand-mark">∑</span>
+            <span className="brand-text"><strong>Toán THPT Thầy Đôi</strong><small className="brand-sub">Ngân hàng câu hỏi · Ma trận đề</small></span>
+          </button>
+          <div className="header-actions">
+            <span className="header-clock"><AppClock /></span>
+            <button className="install-btn compact-install" onClick={() => void installApp()}>📲 <span>Cài app</span></button>
+            <button className="header-icon-btn" onClick={() => { setShowAccountMenu(!showAccountMenu); setShowMobileMenu(false); }}>{session ? '👤 Tài khoản' : 'Đăng nhập'}</button>
+            <button className="header-icon-btn hamburger" onClick={() => { setShowMobileMenu(!showMobileMenu); setShowAccountMenu(false); }} aria-label="Mở menu chức năng">☰</button>
+          </div>
         </div>
-        <nav className="nav-groups">
-          <section className="nav-group nav-home"><button className={tab === 'overview' ? 'active' : ''} onClick={() => setTab('overview')}>⌂ Trang chủ / Bảng điều khiển</button></section>
-          <section className="nav-group"><h3>Đề thi & câu hỏi</h3><button className={tab === 'matrix' ? 'active' : 'hot'} onClick={() => setTab('matrix')}>▦ Tạo đề theo ma trận</button><button className={tab === 'bank' ? 'active' : ''} onClick={() => setTab('bank')}>▤ Ngân hàng câu hỏi</button><button className={tab === 'print' ? 'active' : ''} onClick={() => setTab('print')}>⎙ In đề / đáp án</button><button className={tab === 'admin' ? 'active' : ''} onClick={() => setTab('admin')}>✎ Quản trị câu hỏi</button></section>
-          <section className="nav-group"><h3>Lớp học & kết quả</h3><button className={tab === 'assign' ? 'active' : ''} onClick={() => setTab('assign')}>👥 Lớp học & giao bài</button><button className={tab === 'take' ? 'active' : ''} onClick={() => setTab('take')}>✍ Học sinh làm bài</button><button className={tab === 'results' ? 'active' : ''} onClick={() => setTab('results')}>📊 Kết quả / Thống kê</button><button className={tab === 'payment' ? 'active' : ''} onClick={() => setTab('payment')}>💳 Thanh toán / gia hạn</button>{isAdmin && <button className={tab === 'users' ? 'active' : ''} onClick={() => setTab('users')}>👤 Quản lý người dùng</button>}</section>
-          <section className="nav-group"><h3>Dạy học & học liệu</h3><button className={tab === 'theory' ? 'active' : ''} onClick={() => setTab('theory')}>📘 Lý thuyết</button><button className={tab === 'english' ? 'active' : ''} onClick={() => setTab('english')}>🇬🇧 Toán tiếng Anh</button><button className={tab === 'practice' ? 'active' : ''} onClick={() => setTab('practice')}>🎯 Tự luyện</button><button className={tab === 'news' ? 'active' : ''} onClick={() => setTab('news')}>📰 Tin giáo dục</button></section>
-          <section className="nav-group"><h3>Trò chơi ôn tập</h3><button className={tab === 'games' ? 'active' : ''} onClick={() => setTab('games')}>🎮 Trò chơi 3D</button></section>
-        </nav>
+        {showMobileMenu && (
+          <nav className="mobile-menu" aria-label="Menu chức năng">
+            <section><h3>Đề thi & câu hỏi</h3><button className={tab === 'matrix' ? 'active' : 'hot'} onClick={() => goTab('matrix')}>Tạo đề theo ma trận</button><button className={tab === 'bank' ? 'active' : ''} onClick={() => goTab('bank')}>Ngân hàng câu hỏi</button><button className={tab === 'print' ? 'active' : ''} onClick={() => goTab('print')}>In đề / đáp án</button><button className={tab === 'admin' ? 'active' : ''} onClick={() => goTab('admin')}>Quản trị câu hỏi</button></section>
+            <section><h3>Lớp học & kết quả</h3><button className={tab === 'assign' ? 'active' : ''} onClick={() => goTab('assign')}>Lớp học & giao bài</button><button className={tab === 'take' ? 'active' : ''} onClick={() => goTab('take')}>Học sinh làm bài</button><button className={tab === 'results' ? 'active' : ''} onClick={() => goTab('results')}>Kết quả / Thống kê</button><button className={tab === 'payment' ? 'active' : ''} onClick={() => goTab('payment')}>Thanh toán / gia hạn</button>{isAdmin && <button className={tab === 'users' ? 'active' : ''} onClick={() => goTab('users')}>Quản lý người dùng</button>}</section>
+            <section><h3>Dạy học & học liệu</h3><button className={tab === 'theory' ? 'active' : ''} onClick={() => goTab('theory')}>Lý thuyết</button><button className={tab === 'english' ? 'active' : ''} onClick={() => goTab('english')}>Toán tiếng Anh</button><button className={tab === 'practice' ? 'active' : ''} onClick={() => goTab('practice')}>Tự luyện</button><button className={tab === 'news' ? 'active' : ''} onClick={() => goTab('news')}>Tin giáo dục</button></section>
+            <section><h3>Trò chơi ôn tập</h3><button className={tab === 'games' ? 'active' : ''} onClick={() => goTab('games')}>Trò chơi 3D</button></section>
+          </nav>
+        )}
+        {(showAccountMenu || recoveryToken) && (
+          <section className="account-panel">
+            {session ? (
+              <div className="account-info">
+                <strong>{isAdmin ? 'Quản trị' : profile?.role === 'teacher' ? 'Giáo viên' : 'Học sinh'}: {session.user?.email ?? 'đã đăng nhập'}</strong>
+                <span>{isAdmin ? 'Toàn quyền' : profile?.full_access ? 'Đã được cấp full tính năng' : inTrial ? `Dùng thử full tính năng đến ${new Date(profile!.trial_ends_at).toLocaleDateString('vi-VN')}` : 'Tài khoản giới hạn — liên hệ quản trị để cấp quyền'}</span>
+                <div className="filters"><button onClick={() => goTab('payment')}>Thanh toán / gia hạn</button>{isAdmin && <button onClick={() => goTab('users')}>Quản lý người dùng</button>}<button onClick={() => { signOut(); setSession(null); setProfile(null); setShowAccountMenu(false); }}>Đăng xuất</button></div>
+              </div>
+            ) : (
+              <div className="filters account-form">
+                <label>Email<input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email" /></label>
+                <label>Mật khẩu<input type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="mật khẩu" /></label><button onClick={() => setShowPassword(!showPassword)}>{showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}</button>
+                <label>Vai trò đăng ký<select value={authRole} onChange={(e) => setAuthRole(e.target.value as 'student' | 'teacher')}><option value="student">Học sinh</option><option value="teacher">Giáo viên</option></select></label>
+                <button className="primary" onClick={() => void handleSignIn()}>Đăng nhập</button>
+                <button onClick={() => void handleSignUp()}>Đăng ký</button><button onClick={() => void handleRecover()}>Quên mật khẩu</button><button onClick={() => void handleResend()}>Gửi lại email xác nhận</button>{recoveryToken && <button className="primary" onClick={() => void handleNewPassword()}>Đặt mật khẩu mới</button>}
+                <span>Tài khoản mới được dùng thử full tính năng 3 ngày. Mật khẩu được mã hóa một chiều, app không lưu mật khẩu gốc.</span>
+              </div>
+            )}
+          </section>
+        )}
       </header>
       {showInstallHelp && (
         <section className="notice no-print">
@@ -1791,21 +1826,6 @@ export default function App() {
       )}
       {error && <section className="notice danger no-print">{error}</section>}
       {loading && <p className="muted no-print">Đang tải…</p>}
-      <section className="card no-print">
-        {session ? (
-          <div className="filters"><strong>{isAdmin ? 'Quản trị' : profile?.role === 'teacher' ? 'Giáo viên' : 'Học sinh'}: {session.user?.email ?? 'đã đăng nhập'}</strong><span>{isAdmin ? 'Toàn quyền' : profile?.full_access ? 'Đã được cấp full tính năng' : inTrial ? `Dùng thử full tính năng đến ${new Date(profile!.trial_ends_at).toLocaleDateString('vi-VN')}` : 'Tài khoản giới hạn — liên hệ quản trị để cấp quyền'}</span><button onClick={() => { signOut(); setSession(null); setProfile(null); }}>Đăng xuất</button></div>
-        ) : (
-          <div className="filters">
-            <label>Email<input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email" /></label>
-            <label>Mật khẩu<input type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="mật khẩu" /></label><button onClick={() => setShowPassword(!showPassword)}>{showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}</button>
-            <label>Vai trò đăng ký<select value={authRole} onChange={(e) => setAuthRole(e.target.value as 'student' | 'teacher')}><option value="student">Học sinh</option><option value="teacher">Giáo viên</option></select></label>
-            <button className="primary" onClick={() => void handleSignIn()}>Đăng nhập</button>
-            <button onClick={() => void handleSignUp()}>Đăng ký</button><button onClick={() => void handleRecover()}>Quên mật khẩu</button><button onClick={() => void handleResend()}>Gửi lại email xác nhận</button>{recoveryToken && <button className="primary" onClick={() => void handleNewPassword()}>Đặt mật khẩu mới</button>}
-            <span>Tài khoản mới được dùng thử full tính năng 3 ngày. Mật khẩu được mã hóa một chiều, app không lưu mật khẩu gốc.</span>
-          </div>
-        )}
-      </section>
-
       {tab === 'overview' && (
         <main>
           <section className="card dash-hero">
@@ -1829,16 +1849,15 @@ export default function App() {
           </section>
           <div className="grid dash-groups">
             <section className="card dash-card"><h3>Đề thi & câu hỏi</h3><div className="filters"><button onClick={() => setTab('matrix')}>Tạo đề theo ma trận</button><button onClick={() => setTab('bank')}>Ngân hàng câu hỏi</button><button onClick={() => setTab('print')}>In đề / đáp án</button><button onClick={() => setTab('admin')}>Quản trị câu hỏi</button></div></section>
-            <section className="card dash-card"><h3>Lớp học & kết quả</h3><div className="filters"><button onClick={() => setTab('assign')}>Giao bài</button><button onClick={() => setTab('take')}>Học sinh làm bài</button><button onClick={() => setTab('results')}>Kết quả</button><button onClick={() => setTab('payment')}>Thanh toán / gia hạn</button></div></section>
+            <section className="card dash-card"><h3>Lớp học & kết quả</h3><div className="filters"><button onClick={() => setTab('assign')}>Giao bài</button><button onClick={() => setTab('take')}>Học sinh làm bài</button><button onClick={() => setTab('results')}>Kết quả</button><button onClick={() => setTab('payment')}>Thanh toán / gia hạn</button>{isAdmin && <button onClick={() => setTab('users')}>Quản lý người dùng</button>}</div></section>
             <section className="card dash-card"><h3>Dạy học trên lớp</h3><div className="filters"><button onClick={() => setTab('theory')}>Lý thuyết</button><button onClick={() => setTab('english')}>Toán tiếng Anh</button><button onClick={() => setTab('practice')}>Tự luyện</button><button onClick={() => setTab('news')}>Tin giáo dục</button></div></section>
             <section className="card dash-card"><h3>Trò chơi ôn tập</h3><p className="muted">15 trò chơi có âm thanh, sân khấu 3D/thực tế ảo và kỷ lục cho học sinh.</p><button className="primary" onClick={() => setTab('games')}>Mở trò chơi</button></section>
           </div>
-          <div className="grid">
-            <section className="card"><h2>Tổng số câu</h2><p className="big">{overview?.total ?? '—'}</p><p>Lý thuyết: {overview?.theory ?? '—'} bài</p></section>
+          <div className="grid stats-grid">
+            <section className="card"><h2>Tổng số câu</h2><p className="big">{overview?.total ?? '—'}</p><p>Lý thuyết: {overview?.theory ?? '—'} bài</p><p>Toán tiếng Anh: <strong>{englishTotalAll || '—'}</strong> câu</p><button className="primary" onClick={() => setTab('english')}>Mở Toán tiếng Anh</button></section>
             <section className="card"><h2>Theo lớp</h2>{[10, 11, 12].map((g) => <p key={g}>Lớp {g}: <strong>{overview?.byGrade[g] ?? '—'}</strong></p>)}</section>
             <section className="card"><h2>Theo mức</h2>{LEVELS.map((l) => <p key={l}>{l}: <strong>{overview?.byLevel[l] ?? '—'}</strong></p>)}</section>
             <section className="card"><h2>Theo phần</h2>{QTYPES.map((q) => <p key={q}>{QTYPE_LABEL[q]}: <strong>{overview?.byType[q] ?? '—'}</strong></p>)}</section>
-            <section className="card"><h2>Toán tiếng Anh</h2><p className="big">{englishTotalAll || '—'}</p><p>Bài toán THPT bằng tiếng Anh, có đáp án, lời giải Anh–Việt và từ vựng.</p><button className="primary" onClick={() => setTab('english')}>Mở mục Toán tiếng Anh</button></section>
           </div>
         </main>
       )}
@@ -2283,7 +2302,7 @@ export default function App() {
         <main>
           <section className="card">
             <h2>Thanh toán / Gia hạn gói</h2>
-            <p className="muted">Tài khoản mới được dùng thử 3 ngày full tính năng. Hết hạn, bạn chọn gói gia hạn để tiếp tục dùng full tính năng.</p>
+            <p className="muted">Tài khoản mới được dùng thử 3 ngày full tính năng. Hết hạn, bạn chọn gói gia hạn để tiếp tục dùng full tính năng. Sau khi đăng nhập và tạo giao dịch, app tự kiểm tra thanh toán mỗi 10 giây; khi thanh toán hoàn thành, hệ thống tự gia hạn và ghi sổ giao dịch.</p>
             {session ? <p><strong>{session.user?.email}</strong> · {isAdmin ? 'Quản trị toàn quyền' : profile?.full_access ? 'Đã được cấp full tính năng' : inTrial ? `Đang dùng full tính năng đến ${new Date(profile!.trial_ends_at).toLocaleDateString('vi-VN')}` : 'Tài khoản đang giới hạn'}</p> : <p className="notice">Bạn đăng nhập hoặc tạo tài khoản trước, sau đó chọn gói gia hạn tại đây.</p>}
             <div className="grid">
               {PAYMENT_PACKAGES.map((pack) => (
