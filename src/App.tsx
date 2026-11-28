@@ -3,7 +3,7 @@ import MathText from './MathText';
 import { eqParams, getSession, ilike, isSupabaseConfigured, signIn, signOut, signUp, recoverPassword, resendConfirmation, updatePassword, supabaseCount, supabaseDelete, supabaseGet, supabaseInsert, supabaseUpdate, type AuthSession } from './supabase';
 import { LEVELS, QTYPES, QTYPE_LABEL, type Assignment, type ClassRecord, type ExamRecord, type Level, type QType, type Question, type StudentRecord, type Submission, type TheoryNote } from './types';
 
-type Tab = 'overview' | 'bank' | 'theory' | 'english' | 'matrix' | 'print' | 'assign' | 'take' | 'results' | 'admin' | 'users' | 'practice' | 'news';
+type Tab = 'overview' | 'bank' | 'theory' | 'english' | 'matrix' | 'print' | 'assign' | 'take' | 'results' | 'admin' | 'users' | 'practice' | 'news' | 'games';
 
 interface GeneratedCode {
   code: number;
@@ -63,6 +63,24 @@ const ENGLISH_LESSONS: Record<number, string[]> = {
   11: ['Giá trị lượng giác của góc lượng giác','Công thức lượng giác','Hàm số lượng giác','Phương trình lượng giác','Dãy số','Cấp số cộng','Cấp số nhân','Mẫu số liệu ghép nhóm','Các số đặc trưng đo xu thế trung tâm cho mẫu số liệu ghép nhóm','Đường thẳng và mặt phẳng trong không gian','Hai đường thẳng song song','Đường thẳng song song với mặt phẳng','Hai mặt phẳng song song','Phép chiếu song song','Giới hạn của dãy số','Giới hạn của hàm số','Hàm số liên tục','Lũy thừa với số mũ thực','Lôgarit','Hàm số mũ và hàm số lôgarit','Phương trình, bất phương trình mũ và lôgarit','Hai đường thẳng vuông góc','Đường thẳng vuông góc với mặt phẳng','Phép chiếu vuông góc. Góc giữa đường thẳng và mặt phẳng','Hai mặt phẳng vuông góc','Khoảng cách','Thể tích','Biến cố hợp, biến cố giao, biến cố độc lập','Công thức cộng xác suất','Công thức nhân xác suất cho hai biến cố độc lập','Định nghĩa và ý nghĩa của đạo hàm','Các quy tắc tính đạo hàm','Đạo hàm cấp hai','Phép biến hình trong mặt phẳng','Làm quen với một vài khái niệm của lí thuyết đồ thị','Một số yếu tố vẽ kĩ thuật'],
   12: ['Tính đơn điệu và cực trị của hàm số','Giá trị lớn nhất và giá trị nhỏ nhất của hàm số','Đường tiệm cận của đồ thị hàm số','Khảo sát sự biến thiên và vẽ đồ thị của hàm số','Ứng dụng đạo hàm để giải quyết một số vấn đề liên quan đến thực tiễn','Vectơ trong không gian','Hệ trục tọa độ trong không gian','Biểu thức toạ độ của các phép toán vectơ','Khoảng biến thiên và khoảng tứ phân vị','Phương sai và độ lệch chuẩn','Nguyên hàm','Tích phân','Ứng dụng hình học của tích phân','Phương trình mặt phẳng','Phương trình đường thẳng trong không gian','Phương trình mặt cầu','Công thức tính góc trong không gian','Xác suất có điều kiện','Công thức xác suất toàn phần và công thức Bayes'],
 };
+
+const GAME_MODES = [
+  { id: 'speed', name: 'Đua Tốc Độ', icon: '🏎️', desc: 'Trả lời càng nhanh điểm càng cao', seconds: 20 },
+  { id: 'climb', name: 'Leo Tháp Trí Tuệ', icon: '🗼', desc: 'Đúng leo lên, sai tụt xuống', seconds: 25 },
+  { id: 'boss', name: 'Đấu Boss Toán Học', icon: '🐉', desc: 'Đúng làm boss mất máu', seconds: 25 },
+  { id: 'wheel', name: 'Vòng Quay May Mắn', icon: '🎡', desc: 'Đúng quay nhân điểm x1-x3', seconds: 20 },
+  { id: 'treasure', name: 'Săn Kho Báu', icon: '🗺️', desc: 'Mỗi câu đúng tiến một bước tới kho báu', seconds: 25 },
+  { id: 'streak', name: 'Chuỗi Đúng Liên Hoàn', icon: '🔥', desc: 'Giữ chuỗi đúng để nhân điểm', seconds: 15 },
+  { id: 'race', name: 'Đường Đua Tri Thức', icon: '🏁', desc: 'Đúng tăng tốc về đích', seconds: 20 },
+  { id: 'mystery', name: 'Hộp Bí Mật', icon: '🎁', desc: 'Đúng mở hộp nhận điểm thưởng bí mật', seconds: 20 },
+  { id: 'survival', name: 'Sinh Tồn 3 Mạng', icon: '❤️', desc: 'Sai mất một mạng, hết mạng là thua', seconds: 20, lives: 3 },
+  { id: 'timeattack', name: 'Thử Thách 120 Giây', icon: '⏱️', desc: 'Làm nhiều câu nhất trong 120 giây', seconds: 120, total: true },
+  { id: 'match', name: 'Ghép Đôi Siêu Tốc', icon: '⚡', desc: '10 giây cho mỗi câu', seconds: 10 },
+  { id: 'tower', name: 'Phòng Thủ Tháp', icon: '🏰', desc: 'Sai tháp mất máu, bảo vệ tháp đến cuối', seconds: 20, lives: 5 },
+  { id: 'stars', name: 'Săn Sao Vàng', icon: '⭐', desc: 'Mỗi câu đúng thu một ngôi sao', seconds: 20 },
+  { id: 'sixty', name: 'Thử Thách 60 Giây', icon: '⏰', desc: '60 giây chạy đua với thời gian', seconds: 60, total: true },
+  { id: 'lightning', name: 'Vua Tia Chớp', icon: '🌩️', desc: '5 giây mỗi câu, chỉ dành cho cao thủ', seconds: 5 },
+] as const;
 
 function makeJoinCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -573,6 +591,21 @@ export default function App() {
   const [practiceWrongOnly, setPracticeWrongOnly] = useState(false);
   const [newsQuery, setNewsQuery] = useState('');
   const [practiceHistory, setPracticeHistory] = useState<{ date: string; mode: string; grade: string; correct: number; total: number; seconds: number }[]>(() => { try { return JSON.parse(localStorage.getItem('practice-history') || '[]'); } catch { return []; } });
+  const [gameModeId, setGameModeId] = useState<string>('speed');
+  const [gameLang, setGameLang] = useState<'vi' | 'en'>('vi');
+  const [gameGrade, setGameGrade] = useState(10);
+  const [gameLevel, setGameLevel] = useState('');
+  const [gameQs, setGameQs] = useState<{ content: string; options: string[]; correctIndex: number; explanation: string; meta: string }[]>([]);
+  const [gameIdx, setGameIdx] = useState(0);
+  const [gameScore, setGameScore] = useState(0);
+  const [gameStreak, setGameStreak] = useState(0);
+  const [gameLives, setGameLives] = useState(3);
+  const [gameTimeLeft, setGameTimeLeft] = useState(20);
+  const [gamePicked, setGamePicked] = useState<number | null>(null);
+  const [gameDone, setGameDone] = useState(false);
+  const [gameCorrect, setGameCorrect] = useState(0);
+  const [soundOn, setSoundOn] = useState(true);
+  const [gameBest, setGameBest] = useState<Record<string, number>>(() => { try { return JSON.parse(localStorage.getItem('game-best') || '{}'); } catch { return {}; } });
   const [practiceAnswers, setPracticeAnswers] = useState<Record<number, number>>({});
   const [practiceChecked, setPracticeChecked] = useState(false);
   const [userFilter, setUserFilter] = useState<'all' | 'student' | 'teacher' | 'trial' | 'full' | 'english' | 'requested' | 'limited'>('all');
@@ -721,6 +754,76 @@ export default function App() {
     if (!wrong.length) return;
     setPracticeQs(wrong); setPracticeAnswers({}); setPracticeChecked(false); setPracticeSeconds(0); setPracticeWrongOnly(false);
   }
+
+  function playSound(kind: 'correct' | 'wrong' | 'win' | 'click') {
+    if (!soundOn) return;
+    try {
+      const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const ctx = new AC();
+      const notes: Record<string, number[]> = { correct: [880, 1320], wrong: [220, 160], win: [523, 659, 784, 1047], click: [600] };
+      notes[kind].forEach((f, i) => { const o = ctx.createOscillator(); const g = ctx.createGain(); o.frequency.value = f; o.type = kind === 'wrong' ? 'sawtooth' : 'sine'; g.gain.value = 0.12; o.connect(g); g.connect(ctx.destination); o.start(ctx.currentTime + i * 0.09); o.stop(ctx.currentTime + i * 0.09 + 0.16); });
+    } catch { /* sound optional */ }
+  }
+
+  async function startGame(modeId: string) {
+    const mode = GAME_MODES.find((m) => m.id === modeId) ?? GAME_MODES[0];
+    setGameModeId(modeId); setLoading(true); setError(''); setGameDone(false); setGamePicked(null); setGameIdx(0); setGameScore(0); setGameStreak(0); setGameCorrect(0); setGameLives('lives' in mode ? mode.lives : 99); setGameTimeLeft(mode.seconds);
+    try {
+      if (gameLang === 'en' && !hasEnglish) { setError('Toán tiếng Anh cần quyền truy cập hoặc đang dùng thử.'); return; }
+      const table = gameLang === 'en' ? 'english_questions' : 'questions';
+      const p = eqParams({ grade: gameGrade, qtype: 'single', level: gameLevel || undefined });
+      const total = await supabaseCount(table, p, gameLang === 'en');
+      if (!total) { setError('Chưa có câu trắc nghiệm khớp lựa chọn.'); return; }
+      p.set('select', '*'); p.set('limit', '60'); p.set('offset', String(Math.floor(Math.random() * Math.max(1, total - 60))));
+      if (gameLang === 'en') {
+        const rows = await supabaseGet<EnglishQuestion[]>(table, p, true);
+        setGameQs([...rows].sort(() => Math.random() - 0.5).filter((r) => r.options?.length >= 2).slice(0, 15).map((r) => ({ content: r.problem, options: r.options, correctIndex: correctIndexOf(r.answer, r.options), explanation: r.solution_en, meta: `${r.lesson_vi} • ${r.level}` })));
+      } else {
+        const rows = await supabaseGet<Question[]>(table, p);
+        setGameQs([...rows].sort(() => Math.random() - 0.5).filter((r) => r.options?.length >= 2).slice(0, 15).map((r) => ({ content: stripSourcePrefix(r.content), options: r.options.map(stripOptionPrefix), correctIndex: correctIndexOf(r.correct, r.options), explanation: r.explanation || `Đáp án: ${r.correct}`, meta: `${r.lesson || ''} • ${r.level}` })));
+      }
+      playSound('click');
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setLoading(false); }
+  }
+
+  function answerGame(i: number) {
+    if (gamePicked !== null || gameDone || !gameQs[gameIdx]) return;
+    const mode = GAME_MODES.find((m) => m.id === gameModeId) ?? GAME_MODES[0];
+    const ok = i === gameQs[gameIdx].correctIndex;
+    setGamePicked(i);
+    let score = gameScore; let lives = gameLives; let streak = gameStreak; let correct = gameCorrect;
+    if (ok) {
+      correct += 1; streak += 1;
+      let pts = 100;
+      if (mode.id === 'speed' || mode.id === 'match' || mode.id === 'lightning') pts += gameTimeLeft * 10;
+      if (mode.id === 'streak') pts += streak * 20;
+      if (mode.id === 'wheel') pts *= 1 + Math.floor(Math.random() * 3);
+      if (mode.id === 'mystery') pts += Math.floor(Math.random() * 101);
+      score += pts; playSound('correct');
+    } else {
+      streak = 0; lives -= 1; playSound('wrong');
+    }
+    setGameScore(score); setGameStreak(streak); setGameLives(lives); setGameCorrect(correct);
+    setTimeout(() => {
+      if (lives <= 0 || gameIdx + 1 >= gameQs.length) {
+        setGameDone(true); playSound('win');
+        setGameBest((prev) => { const next = { ...prev, [mode.id]: Math.max(prev[mode.id] ?? 0, score) }; localStorage.setItem('game-best', JSON.stringify(next)); return next; });
+      } else {
+        setGameIdx(gameIdx + 1); setGamePicked(null);
+        if (!('total' in mode && mode.total)) setGameTimeLeft(mode.seconds);
+      }
+    }, 1000);
+  }
+
+  useEffect(() => {
+    if (!gameQs.length || gameDone || gamePicked !== null) return;
+    const t = setInterval(() => setGameTimeLeft((v) => Math.max(0, v - 1)), 1000);
+    return () => clearInterval(t);
+  }, [gameQs, gameDone, gamePicked, gameIdx]);
+
+  useEffect(() => {
+    if (gameQs.length && !gameDone && gamePicked === null && gameTimeLeft === 0) answerGame(-1);
+  }, [gameTimeLeft]);
 
   async function startPractice() {
     setLoading(true); setError(''); setPracticeChecked(false); setPracticeAnswers({}); setPracticeSeconds(0); setPracticeWrongOnly(false);
@@ -1538,7 +1641,7 @@ export default function App() {
           <button className="install-btn" onClick={() => void installApp()}>📲 Cài ứng dụng</button>
         </div>
         <nav>
-          {([['overview', 'Tổng quan'], ['bank', 'Ngân hàng câu hỏi'], ['theory', 'Lý thuyết'], ['english', 'Toán tiếng Anh'], ['matrix', 'Tạo đề'], ['print', 'In đề'], ['assign', 'Giao bài'], ['take', 'Học sinh làm bài'], ['results', 'Kết quả'], ['practice', 'Tự luyện'], ['news', 'Tin giáo dục'], ['admin', 'Quản trị'], ...(isAdmin ? [['users', 'Quản lý người dùng'] as [Tab, string]] : [])] as [Tab, string][]).map(([t, label]) => (
+          {([['overview', 'Tổng quan'], ['bank', 'Ngân hàng câu hỏi'], ['theory', 'Lý thuyết'], ['english', 'Toán tiếng Anh'], ['matrix', 'Tạo đề'], ['print', 'In đề'], ['assign', 'Giao bài'], ['take', 'Học sinh làm bài'], ['results', 'Kết quả'], ['practice', 'Tự luyện'], ['games', 'Trò chơi'], ['news', 'Tin giáo dục'], ['admin', 'Quản trị'], ...(isAdmin ? [['users', 'Quản lý người dùng'] as [Tab, string]] : [])] as [Tab, string][]).map(([t, label]) => (
             <button key={t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)}>{label}</button>
           ))}
         </nav>
@@ -1907,6 +2010,28 @@ export default function App() {
           ))}
           {practiceQs.length > 0 && !practiceChecked && <button className="primary" onClick={submitPractice}>Nộp bài</button>}
           {practiceChecked && <div className="filters"><button onClick={() => void startPractice()}>Làm bộ mới</button><button onClick={() => setPracticeWrongOnly(!practiceWrongOnly)}>{practiceWrongOnly ? 'Xem tất cả' : 'Chỉ xem câu sai'}</button><button onClick={retryWrong}>Luyện lại câu sai</button></div>}
+        </main>
+      )}
+
+      {tab === 'games' && (
+        <main className="card no-print">
+          <h2>Trò chơi Toán học</h2>
+          <p className="muted">15 trò chơi biến tấu riêng của Toán THPT Thầy Đôi, lấy câu từ ngân hàng theo lớp và mức độ.</p>
+          <div className="filters">
+            <label>Ngôn ngữ<select value={gameLang} onChange={(e) => setGameLang(e.target.value as 'vi' | 'en')}><option value="vi">Tiếng Việt</option><option value="en">Tiếng Anh</option></select></label>
+            <label>Lớp<select value={gameGrade} onChange={(e) => setGameGrade(Number(e.target.value))}><option>10</option><option>11</option><option>12</option></select></label>
+            <label>Mức độ<select value={gameLevel} onChange={(e) => setGameLevel(e.target.value)}><option value="">Tất cả</option>{LEVELS.map((l) => <option key={l} value={l}>{l}</option>)}</select></label>
+            <button onClick={() => setSoundOn(!soundOn)}>{soundOn ? '🔊 Âm thanh: Bật' : '🔇 Âm thanh: Tắt'}</button>
+          </div>
+          <div className="filters">{GAME_MODES.map((m) => <button key={m.id} className={gameModeId === m.id ? 'primary' : ''} onClick={() => void startGame(m.id)} title={m.desc}>{m.icon} {m.name}{gameBest[m.id] ? ` (kỷ lục ${gameBest[m.id]})` : ''}</button>)}</div>
+          {gameQs.length > 0 && !gameDone && gameQs[gameIdx] && (<section className="card">
+            <p><strong>{GAME_MODES.find((m) => m.id === gameModeId)?.icon} {GAME_MODES.find((m) => m.id === gameModeId)?.name}</strong> • Câu {gameIdx + 1}/{gameQs.length} • Điểm: {gameScore} • Chuỗi đúng: {gameStreak} 🔥 • Thời gian: {gameTimeLeft}s{gameLives < 90 ? ` • Mạng: ${gameLives} ❤️` : ''}</p>
+            <p className="muted">{gameQs[gameIdx].meta}</p>
+            <MathText text={gameQs[gameIdx].content} />
+            <div className="filters">{gameQs[gameIdx].options.map((op, i) => <button key={i} disabled={gamePicked !== null} className={gamePicked !== null && i === gameQs[gameIdx].correctIndex ? 'primary' : ''} onClick={() => answerGame(i)}>{String.fromCharCode(65 + i)}. <MathText text={op} /></button>)}</div>
+            {gamePicked !== null && <p>{gamePicked === gameQs[gameIdx].correctIndex ? '🎉 Đúng rồi!' : '😢 Chưa đúng.'} <MathText text={gameQs[gameIdx].explanation} /></p>}
+          </section>)}
+          {gameDone && <section className="card"><h3>🏆 Kết thúc trò chơi</h3><p>Điểm: <strong>{gameScore}</strong> • Đúng {gameCorrect}/{gameQs.length} câu • Kỷ lục: {gameBest[gameModeId] ?? gameScore}</p><button className="primary" onClick={() => void startGame(gameModeId)}>Chơi lại</button></section>}
         </main>
       )}
 
