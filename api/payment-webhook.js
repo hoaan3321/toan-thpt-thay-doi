@@ -36,17 +36,18 @@ export default async function handler(req, res) {
   }
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
   if (!cfg.url || !cfg.key || !cfg.secret) { res.status(503).json({ error: 'Payment webhook is not configured' }); return; }
-  const secret = req.headers['x-payment-secret'] || req.headers['x-webhook-secret'] || '';
-  if (secret !== cfg.secret) { res.status(401).json({ error: 'Invalid webhook secret' }); return; }
+  const auth = String(req.headers.authorization || '');
+  const secret = req.headers['x-payment-secret'] || req.headers['x-webhook-secret'] || (auth.toLowerCase().startsWith('apikey ') ? auth.slice(7) : '') || (auth.toLowerCase().startsWith('bearer ') ? auth.slice(7) : '');
+  if (secret !== cfg.secret) { res.status(401).json({ success: false, error: 'Invalid webhook secret' }); return; }
   const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
-  if (!isSuccessfulPayment(body)) { res.status(202).json({ ok: false, ignored: true, reason: 'payment_not_successful' }); return; }
+  if (!isSuccessfulPayment(body)) { res.status(200).json({ success: true, matched: false, ignored: true, reason: 'payment_not_successful' }); return; }
   const transferCode = extractTransferCode(body);
-  if (!transferCode) { res.status(400).json({ error: 'Missing transfer_code' }); return; }
+  if (!transferCode) { res.status(200).json({ success: true, matched: false, reason: 'missing_transfer_code' }); return; }
   const amount = parseAmount(body);
-  if (amount === null) { res.status(400).json({ error: 'Missing amount' }); return; }
+  if (amount === null) { res.status(200).json({ success: true, matched: false, reason: 'missing_amount' }); return; }
   const data = body.data || body;
-  const providerRef = String(data.provider_ref || data.transaction_id || data.reference || data.ref || data.id || body.id || '');
-  const provider = String(data.provider || body.provider || 'webhook');
+  const providerRef = String(data.provider_ref || data.transaction_id || data.reference || data.referenceCode || data.ref || (data.id ? `sepay-${data.id}` : '') || (body.id ? `sepay-${body.id}` : ''));
+  const provider = String(data.provider || body.provider || (data.gateway || data.transferType ? 'sepay' : 'webhook'));
   const rpc = await fetch(`${cfg.url}/rest/v1/rpc/complete_payment_request`, {
     method: 'POST',
     headers: { apikey: cfg.key, Authorization: `Bearer ${cfg.key}`, 'Content-Type': 'application/json' },
@@ -54,5 +55,5 @@ export default async function handler(req, res) {
   });
   const data = await rpc.json().catch(() => ({}));
   if (!rpc.ok) { res.status(502).json({ error: 'Supabase RPC failed', detail: data }); return; }
-  res.status(data?.ok ? 200 : (data?.error === 'amount_mismatch' || data?.error === 'duplicate_provider_ref' ? 409 : 404)).json(data);
+  res.status(200).json({ success: true, matched: Boolean(data?.ok), ...data });
 }
