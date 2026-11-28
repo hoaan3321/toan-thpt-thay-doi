@@ -170,9 +170,9 @@ function latexToText(input: string): string {
 const MATH_SYMBOLS: Record<string, string> = {
   pi: 'π', infty: '∞', alpha: 'α', beta: 'β', gamma: 'γ', delta: 'δ', Delta: 'Δ', theta: 'θ', lambda: 'λ', mu: 'μ', sigma: 'σ', phi: 'φ', varphi: 'φ', omega: 'ω', Omega: 'Ω', epsilon: 'ε', varepsilon: 'ε', rho: 'ρ', tau: 'τ', xi: 'ξ', eta: 'η', kappa: 'κ', nu: 'ν', psi: 'ψ', chi: 'χ', zeta: 'ζ',
   le: '≤', leq: '≤', ge: '≥', geq: '≥', ne: '≠', neq: '≠', approx: '≈', times: '×', cdot: '·', pm: '±', mp: '∓', div: '÷', in: '∈', notin: '∉', subset: '⊂', subseteq: '⊆', supset: '⊃', cup: '∪', cap: '∩', setminus: '∖', emptyset: '∅', varnothing: '∅',
-  rightarrow: '→', to: '→', leftarrow: '←', Rightarrow: '⇒', Leftarrow: '⇐', Leftrightarrow: '⇔', iff: '⇔', implies: '⇒', mapsto: '↦', angle: '∠', perp: '⊥', parallel: '∥', triangle: '△', sim: '∼', simeq: '≃', cong: '≅', equiv: '≡', propto: '∝', forall: '∀', exists: '∃', neg: '¬', land: '∧', lor: '∨', mid: '∣', nmid: '∤', prime: '′', circ: '∘', bullet: '•', cdots: '⋯', ldots: '…', dots: '…', vdots: '⋮', ddots: '⋱', degree: '°', circled: '°',
+  rightarrow: '→', to: '→', leftarrow: '←', Rightarrow: '⇒', Leftarrow: '⇐', Leftrightarrow: '⇔', iff: '⇔', implies: '⇒', mapsto: '↦', angle: '∠', perp: '⊥', parallel: '∥', triangle: '△', sim: '∼', simeq: '≃', cong: '≅', equiv: '≡', propto: '∝', forall: '∀', exists: '∃', neg: '¬', land: '∧', lor: '∨', mid: '∣', nmid: '∤', prime: '′', circ: '∘', bullet: '•', cdots: '⋯', ldots: '…', dots: '…', vdots: '⋮', ddots: '⋱', degree: '°', circled: '°', ell: 'ℓ', ast: '∗', lfloor: '⌊', rfloor: '⌋', lceil: '⌈', rceil: '⌉', langle: '⟨', rangle: '⟩', nabla: '∇', partial: '∂', nexists: '∄', gtrsim: '≳', lesssim: '≲', nless: '≮', ngtr: '≯', nearrow: '↗', searrow: '↘', nwarrow: '↖', swarrow: '↙', frown: '⌢', longrightarrow: '⟶', longleftarrow: '⟵', longleftrightarrow: '⟷', hookrightarrow: '↪', uparrow: '↑', downarrow: '↓', hbar: 'ħ',
 };
-const MATH_FUNCS = new Set(['sin', 'cos', 'tan', 'cot', 'sec', 'csc', 'ln', 'log', 'exp', 'lim', 'min', 'max', 'sup', 'inf', 'det', 'gcd', 'lcm', 'arcsin', 'arccos', 'arctan', 'sinh', 'cosh', 'tanh', 'mod']);
+const MATH_FUNCS = new Set(['sin', 'cos', 'tan', 'cot', 'sec', 'csc', 'ln', 'log', 'exp', 'lim', 'min', 'max', 'sup', 'inf', 'det', 'gcd', 'lcm', 'arcsin', 'arccos', 'arctan', 'sinh', 'cosh', 'tanh', 'mod', 'lg']);
 
 function mRun(text: string, upright = false): string {
   if (!text) return '';
@@ -199,6 +199,16 @@ function latexToOmml(input: string): string {
     if (peek() === ']') i++;
     return out;
   }
+  function readArg(): string {
+    if (peek() === '{') return readGroup();
+    const ch = peek();
+    if (/[0-9a-zA-Z]/.test(ch)) { i++; return mRun(ch); }
+    return parsePrimary();
+  }
+  function skipLimits(): void {
+    if (s.startsWith('\\limits', i)) i += 7;
+    else if (s.startsWith('\\nolimits', i)) i += 9;
+  }
   function parsePrimary(): string {
     const ch = peek();
     if (!ch) return '';
@@ -209,11 +219,12 @@ function latexToOmml(input: string): string {
       if (!m) { const c = s[i] ?? ''; i++; return mRun(c === ',' || c === ';' || c === ' ' ? ' ' : c); }
       const cmd = m[0];
       i += cmd.length;
-      if (cmd === 'frac' || cmd === 'dfrac' || cmd === 'tfrac') { const num = readGroup(); const den = readGroup(); return `<m:f><m:fPr><m:type m:val="bar"/></m:fPr><m:num>${num}</m:num><m:den>${den}</m:den></m:f>`; }
-      if (cmd === 'sqrt') { const deg = readBracket(); const e = readGroup(); return `<m:rad><m:radPr>${deg ? '' : '<m:degHide m:val="1"/>'}</m:radPr><m:deg>${deg}</m:deg><m:e>${e}</m:e></m:rad>`; }
+      if (cmd === 'frac' || cmd === 'dfrac' || cmd === 'tfrac') { const num = readArg(); const den = readArg(); return `<m:f><m:fPr><m:type m:val="bar"/></m:fPr><m:num>${num}</m:num><m:den>${den}</m:den></m:f>`; }
+      if (cmd === 'sqrt') { const deg = readBracket(); const e = readArg(); return `<m:rad><m:radPr>${deg ? '' : '<m:degHide m:val="1"/>'}</m:radPr><m:deg>${deg}</m:deg><m:e>${e}</m:e></m:rad>`; }
       if (cmd === 'sum' || cmd === 'prod' || cmd === 'int' || cmd === 'iint' || cmd === 'oint') {
         const chr = cmd === 'sum' ? '∑' : cmd === 'prod' ? '∏' : cmd === 'oint' ? '∮' : cmd === 'iint' ? '∬' : '∫';
         let sub = ''; let sup = '';
+        skipLimits();
         for (let k = 0; k < 2; k++) { if (peek() === '_') { i++; sub = readGroup(); } else if (peek() === '^') { i++; sup = readGroup(); } }
         const e = i < s.length && peek() !== '}' ? parseTerm() : '';
         return `<m:nary><m:naryPr><m:chr m:val="${chr}"/><m:limLoc m:val="subSup"/><m:grow m:val="1"/></m:naryPr><m:sub>${sub}</m:sub><m:sup>${sup}</m:sup><m:e>${e}</m:e></m:nary>`;
@@ -235,7 +246,13 @@ function latexToOmml(input: string): string {
         const endIdx = s.indexOf(endMark, i);
         const raw = endIdx >= 0 ? s.slice(start, endIdx) : s.slice(start);
         i = endIdx >= 0 ? endIdx + endMark.length : s.length;
-        const rows = raw.split(/\\\\/).map((r) => r.trim()).filter(Boolean);
+        let bodyRaw = raw;
+        if (env === 'array') bodyRaw = bodyRaw.replace(/^\s*\{[^{}]*\}/, '');
+        const rows = bodyRaw.split(/\\\\/).map((r) => r.replace(/\\hline/g, '').trim()).filter(Boolean);
+        if (env === 'aligned' || env === 'align' || env === 'gathered' || env === 'eqnarray') {
+          const eqRows = rows.map((r) => `<m:e>${latexToOmmlInner(r.replace(/&/g, ''))}</m:e>`).join('');
+          return `<m:eqArr>${eqRows}</m:eqArr>`;
+        }
         if (env === 'cases') {
           const eqRows = rows.map((r) => `<m:e>${latexToOmmlInner(r)}</m:e>`).join('');
           return `<m:d><m:dPr><m:begChr m:val="{"/><m:endChr m:val=""/></m:dPr><m:e><m:eqArr>${eqRows}</m:eqArr></m:e></m:d>`;
@@ -247,7 +264,7 @@ function latexToOmml(input: string): string {
         if (env === 'vmatrix') return `<m:d><m:dPr><m:begChr m:val="|"/><m:endChr m:val="|"/></m:dPr><m:e>${matrix}</m:e></m:d>`;
         return matrix;
       }
-      if (cmd === 'text' || cmd === 'mathrm' || cmd === 'textbf' || cmd === 'textit') {
+      if (cmd === 'text' || cmd === 'mathrm' || cmd === 'textbf' || cmd === 'textit' || cmd === 'operatorname') {
         const start = i;
         if (peek() === '{') { let depth = 0; let j = i; while (j < s.length) { if (s[j] === '{') depth++; if (s[j] === '}') { depth--; if (!depth) break; } j++; } const raw = s.slice(start + 1, j); i = j + 1; return mRun(raw, true); }
         return '';
@@ -259,12 +276,39 @@ function latexToOmml(input: string): string {
       if (cmd === 'vec') return `<m:acc><m:accPr><m:chr m:val="⃗"/></m:accPr><m:e>${readGroup()}</m:e></m:acc>`;
       if (cmd === 'tilde') return `<m:acc><m:accPr><m:chr m:val="̃"/></m:accPr><m:e>${readGroup()}</m:e></m:acc>`;
       if (cmd === 'dot') return `<m:acc><m:accPr><m:chr m:val="̇"/></m:accPr><m:e>${readGroup()}</m:e></m:acc>`;
-      if (cmd === 'lim') { let sub = ''; if (peek() === '_') { i++; sub = readGroup(); } return sub ? `<m:sSub><m:e>${mRun('lim', true)}</m:e><m:sub>${sub}</m:sub></m:sSub>` : mRun('lim', true); }
+      if (cmd === 'overrightarrow') return `<m:acc><m:accPr><m:chr m:val="\u{20D7}"/></m:accPr><m:e>${readGroup()}</m:e></m:acc>`;
+      if (cmd === 'overleftarrow') return `<m:acc><m:accPr><m:chr m:val="\u{20D6}"/></m:accPr><m:e>${readGroup()}</m:e></m:acc>`;
+      if (cmd === 'overleftrightarrow') return `<m:acc><m:accPr><m:chr m:val="\u{20E1}"/></m:accPr><m:e>${readGroup()}</m:e></m:acc>`;
+      if (cmd === 'widehat') return `<m:acc><m:accPr><m:chr m:val="\u{0302}"/></m:accPr><m:e>${readGroup()}</m:e></m:acc>`;
+      if (cmd === 'widetilde') return `<m:acc><m:accPr><m:chr m:val="\u{0303}"/></m:accPr><m:e>${readGroup()}</m:e></m:acc>`;
+      if (cmd === 'binom' || cmd === 'dbinom' || cmd === 'tbinom') { const num = readArg(); const den = readArg(); return `<m:d><m:dPr><m:begChr m:val="("/><m:endChr m:val=")"/></m:dPr><m:e><m:f><m:fPr><m:type m:val="noBar"/></m:fPr><m:num>${num}</m:num><m:den>${den}</m:den></m:f></m:e></m:d>`; }
+      if (cmd === 'overset') { const lim = readArg(); const e = readArg(); return `<m:limUpp><m:e>${e}</m:e><m:lim>${lim}</m:lim></m:limUpp>`; }
+      if (cmd === 'underset') { const lim = readArg(); const e = readArg(); return `<m:limLow><m:e>${e}</m:e><m:lim>${lim}</m:lim></m:limLow>`; }
+      if (cmd === 'overbrace') return `<m:groupChr><m:groupChrPr><m:chr m:val="\u{23DE}"/><m:pos m:val="top"/></m:groupChrPr><m:e>${readGroup()}</m:e></m:groupChr>`;
+      if (cmd === 'underbrace') return `<m:groupChr><m:groupChrPr><m:chr m:val="\u{23DF}"/><m:pos m:val="bot"/></m:groupChrPr><m:e>${readGroup()}</m:e></m:groupChr>`;
+      if (cmd === 'pmod') return `${mRun(' (mod ', true)}${readArg()}${mRun(')', true)}`;
+      if (cmd === 'not') {
+        const nx = peek();
+        if (nx === '=') { i++; return mRun('≠'); }
+        if (nx === '<') { i++; return mRun('≮'); }
+        if (nx === '>') { i++; return mRun('≯'); }
+        if (s.startsWith('\\in', i) && !/[a-zA-Z]/.test(s[i + 3] ?? '')) { i += 3; return mRun('∉'); }
+        if (s.startsWith('\\subset', i)) { i += 7; return mRun('⊄'); }
+        if (s.startsWith('\\equiv', i)) { i += 6; return mRun('≢'); }
+        if (/[0-9a-zA-Z]/.test(nx)) { i++; return mRun(nx + '\u{0338}'); }
+        return parsePrimary();
+      }
+      if (cmd === 'big' || cmd === 'Big' || cmd === 'bigg' || cmd === 'Bigg' || cmd === 'bigl' || cmd === 'bigr' || cmd === 'Bigl' || cmd === 'Bigr' || cmd === 'biggl' || cmd === 'biggr' || cmd === 'Biggl' || cmd === 'Biggr' || cmd === 'middle') return parsePrimary();
+      if (cmd === 'limits' || cmd === 'nolimits') return mRun('\u{200B}');
+      if (cmd === 'displaystyle' || cmd === 'textstyle' || cmd === 'scriptstyle' || cmd === 'scriptscriptstyle') return parseTerm();
+      if (cmd === 'lim') { let sub = ''; skipLimits(); if (peek() === '_') { i++; sub = readGroup(); } return sub ? `<m:sSub><m:e>${mRun('lim', true)}</m:e><m:sub>${sub}</m:sub></m:sSub>` : mRun('lim', true); }
       if (MATH_FUNCS.has(cmd)) return mRun(cmd, true);
       if (MATH_SYMBOLS[cmd]) return mRun(MATH_SYMBOLS[cmd]);
       if (cmd === 'quad' || cmd === 'qquad') return mRun('  ');
       if (peek() === '{') return readGroup();
-      return '';
+      const known = [...Object.keys(MATH_SYMBOLS), ...MATH_FUNCS].filter((k) => cmd.length > k.length && cmd.startsWith(k)).sort((a, b) => b.length - a.length)[0];
+      if (known) { const head = MATH_SYMBOLS[known] ? mRun(MATH_SYMBOLS[known]) : mRun(known, true); return head + [...cmd.slice(known.length)].map((c) => mRun(c)).join(''); }
+      return mRun(cmd);
     }
     if (ch === '^' || ch === '_' || ch === '}') return '';
     i++;
@@ -289,7 +333,7 @@ function latexToOmml(input: string): string {
     return base;
   }
   let out = '';
-  while (i < s.length) out += parseTerm();
+  while (i < s.length) { if (peek() === '}') { i++; continue; } out += parseTerm(); }
   return out;
 }
 
@@ -486,6 +530,7 @@ export default function App() {
   const [mastered, setMastered] = useState<Set<string>>(() => { try { return new Set(JSON.parse(localStorage.getItem('english-vocab-mastered') ?? '[]') as string[]); } catch { return new Set(); } });
 
   const [mGrade, setMGrade] = useState(12);
+  const [examLang, setExamLang] = useState<'vi' | 'en'>('vi');
   const [scopeMode, setScopeMode] = useState<'all' | 'chapter' | 'lesson'>('all');
   const [mChapter, setMChapter] = useState('');
   const [mLesson, setMLesson] = useState('');
@@ -909,6 +954,21 @@ export default function App() {
   }
 
   async function loadScopedPool(): Promise<Question[]> {
+    if (examLang === 'en') {
+      const ep = eqParams({ grade: mGrade });
+      ep.set('select', '*'); ep.set('order', 'id.asc');
+      const erows: EnglishQuestion[] = [];
+      for (let offset = 0; ; offset += 1000) {
+        const pp = new URLSearchParams(ep); pp.set('limit', '1000'); pp.set('offset', String(offset));
+        const rows = await supabaseGet<EnglishQuestion[]>('english_questions', pp, true);
+        erows.push(...rows);
+        if (rows.length < 1000) break;
+      }
+      let pool = erows;
+      if (scopeMode === 'lesson') pool = pool.filter((q) => q.lesson_vi === lessonTitle(mLesson));
+      if (scopeMode === 'chapter') { const titles = new Set(scopeLessons.filter((l) => baseChapter(l.name) === mChapter).map((l) => lessonTitle(l.name))); pool = pool.filter((q) => titles.has(q.lesson_vi)); }
+      return pool.map((q) => ({ id: 900000000 + q.id, grade: q.grade, chapter: q.lesson_vi, lesson: q.lesson_vi, dang: q.dang, level: q.level as Level, qtype: q.qtype, content: q.problem, options: q.options ?? [], correct: q.answer, explanation: q.solution_en, points: 0 }));
+    }
     const p = eqParams({ grade: mGrade });
     if (scopeMode === 'lesson') p.set('lesson', `eq.${lessonTitle(mLesson)}`);
     if (scopeMode === 'chapter') p.set('chapter', `like.${mChapter}*`);
@@ -1614,6 +1674,7 @@ export default function App() {
         <main className="card no-print">
           <h2>Tạo đề theo ma trận</h2>
           <div className="filters">
+            <label>Ngôn ngữ đề<select value={examLang} onChange={(e) => setExamLang(e.target.value as 'vi' | 'en')}><option value="vi">Tiếng Việt</option><option value="en">Tiếng Anh</option></select></label>
             <label>Lớp<select value={mGrade} onChange={(e) => { setMGrade(Number(e.target.value)); setMChapter(''); setMLesson(''); }}><option>10</option><option>11</option><option>12</option></select></label>
             <label>Phạm vi<select value={scopeMode} onChange={(e) => setScopeMode(e.target.value as 'all' | 'chapter' | 'lesson')}><option value="all">Toàn khối</option><option value="chapter">Theo chương</option><option value="lesson">Theo bài</option></select></label>
             {scopeMode === 'chapter' && <label>Chương<select value={mChapter} onChange={(e) => setMChapter(e.target.value)}>{scopeChapters.map((c) => <option key={c.name} value={c.name}>{c.name} ({c.count} câu)</option>)}</select></label>}
@@ -1628,6 +1689,19 @@ export default function App() {
           <div className="filters">{QTYPES.map((q) => <label key={q}>{QTYPE_LABEL[q]}<input type="number" min={0} step="0.25" value={partPoints[q]} onChange={(e) => setPartPoints({ ...partPoints, [q]: Math.max(0, Number(e.target.value)) })} /><span className="muted">{partNeed[q] > 0 ? `${fmtPoints(partPoints[q] / partNeed[q])} đ/câu` : '—'}</span></label>)}</div>
           <p className="muted">Tổng điểm đề: {fmtPoints(QTYPES.reduce((s, q) => s + (partNeed[q] > 0 ? partPoints[q] : 0), 0))} điểm. Điểm mỗi câu bằng điểm của phần chia cho số câu của phần đó. Tổng theo mức phải bằng tổng theo phần; thiếu câu sẽ báo rõ.</p>
           <button className="primary" onClick={() => void generateExam()}>Sinh mã đề</button>
+          {examLang === 'en' && <p className="muted">Đề tiếng Anh lấy từ kho Toán tiếng Anh theo đúng ma trận mức × phần; thầy in hoặc xuất file trực tiếp ở mục In đề.</p>}
+          {(() => { const cap = {} as Record<Level, Record<QType, number>>; for (const l of LEVELS) { cap[l] = {} as Record<QType, number>; for (const q of QTYPES) cap[l][q] = 999; } const cells = buildCellCounts(levelNeed, partNeed, cap); const levelName: Record<Level, string> = { NB: 'Nhận biết', TH: 'Thông hiểu', VD: 'Vận dụng', VDC: 'Vận dụng cao' }; const yeuCau: Record<Level, string> = { NB: 'Nhận biết, nhắc lại kiến thức cơ bản', TH: 'Hiểu và áp dụng trực tiếp kiến thức', VD: 'Vận dụng kiến thức để giải quyết bài toán quen thuộc', VDC: 'Vận dụng linh hoạt, sáng tạo vào bài toán phức tạp' }; const scopeLabel = scopeMode === 'all' ? `Toàn khối ${mGrade}` : scopeMode === 'chapter' ? mChapter : lessonTitle(mLesson); return (<>
+            <h3>Ma trận đề</h3>
+            <div style={{ overflowX: 'auto' }}><table><thead><tr><th>Phần</th>{LEVELS.map((l) => <th key={l}>{levelName[l]}</th>)}<th>Tổng câu</th><th>Điểm</th></tr></thead><tbody>
+              {QTYPES.map((q) => <tr key={q}><td>{QTYPE_LABEL[q]}</td>{LEVELS.map((l) => <td key={l}>{cells ? cells[l][q] : 0}</td>)}<td>{partNeed[q]}</td><td>{fmtPoints(partPoints[q])}</td></tr>)}
+              <tr><td><strong>Tổng</strong></td>{LEVELS.map((l) => <td key={l}><strong>{levelNeed[l]}</strong></td>)}<td><strong>{QTYPES.reduce((a, q) => a + partNeed[q], 0)}</strong></td><td><strong>{fmtPoints(QTYPES.reduce((a, q) => a + (partNeed[q] > 0 ? partPoints[q] : 0), 0))}</strong></td></tr>
+            </tbody></table></div>
+            <h3>Ma trận đặc tả</h3>
+            <p className="muted">Theo hướng dẫn của Bộ GD&ĐT về ma trận đề kiểm tra và bản đặc tả.</p>
+            <div style={{ overflowX: 'auto' }}><table><thead><tr><th>TT</th><th>Nội dung</th><th>Phần</th><th>Mức độ</th><th>Số câu</th><th>Điểm</th><th>Yêu cầu cần đạt</th></tr></thead><tbody>
+              {cells ? QTYPES.flatMap((q) => LEVELS.filter((l) => cells[l][q] > 0).map((l) => ({ q, l }))).map(({ q, l }, i) => <tr key={`${q}-${l}`}><td>{i + 1}</td><td>{scopeLabel}</td><td>{QTYPE_LABEL[q]}</td><td>{levelName[l]}</td><td>{cells[l][q]}</td><td>{fmtPoints(partNeed[q] > 0 ? (partPoints[q] / partNeed[q]) * cells[l][q] : 0)}</td><td>{yeuCau[l]}</td></tr>) : <tr><td colSpan={7}>Tổng theo mức phải bằng tổng theo phần để lập đặc tả.</td></tr>}
+            </tbody></table></div>
+          </>); })()}
           <div className="filters">
             <label>Tên đề<input value={examTitle} onChange={(e) => setExamTitle(e.target.value)} /></label>
             <label>Thời gian (phút)<input type="number" min={1} value={duration} onChange={(e) => setDuration(Math.max(1, Number(e.target.value)))} /></label>
