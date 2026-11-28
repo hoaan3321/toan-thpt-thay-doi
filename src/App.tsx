@@ -2034,7 +2034,13 @@ export default function App() {
               {gamePicked !== null && gamePicked === gameQs[gameIdx].correctIndex && Array.from({ length: 14 }).map((_, i) => <span key={i} className="confetti-dot" style={{ left: `${(i * 7) % 100}%`, background: ['#ef4444', '#f59e0b', '#22c55e', '#3b82f6', '#a855f7'][i % 5], animationDelay: `${(i % 5) * 0.06}s` }} />)}
               {gameModeId === 'boss' && <><span className={gamePicked !== null && gamePicked === gameQs[gameIdx].correctIndex ? 'game-shake' : 'game-float'} style={{ fontSize: 56 }}>🐉</span><div style={{ background: '#fecaca', borderRadius: 8, height: 14, margin: '6px 20px' }}><div style={{ width: `${Math.max(0, 100 - gameCorrect * 20)}%`, background: '#dc2626', height: '100%', borderRadius: 8, transition: 'width .5s' }} /></div><span>Máu Boss: {Math.max(0, 100 - gameCorrect * 20)}%</span></>}
               {gameModeId === 'climb' && <div style={{ fontSize: 30 }}>{Array.from({ length: Math.min(10, gameCorrect) }).map((_, i) => <span key={i} className="game-pop">🟩</span>)}{gameCorrect === 0 && '🧗 Bắt đầu leo tháp!'}</div>}
-              {(gameModeId === 'speed' || gameModeId === 'race') && <div style={{ textAlign: 'left', fontSize: 34 }}><span style={{ marginLeft: `${(gameCorrect / gameQs.length) * 85}%`, transition: 'margin .5s' }}>🏎️</span><div style={{ borderTop: '4px dashed #64748b' }} /><span style={{ float: 'right' }}>🏁</span></div>}
+              {(gameModeId === 'speed' || gameModeId === 'race') && <div className="race-track">
+                <div className="race-lane" style={{ top: 36 }} /><div className="race-lane" style={{ top: 72 }} />
+                <span className="race-car" style={{ left: `${4 + (gameCorrect / Math.max(1, gameQs.length)) * 78}%`, top: 52 }}>🏎️</span>
+                <span className="race-car" style={{ left: `${4 + ((gameIdx * 37) % 60)}%`, top: 6, fontSize: 30, opacity: 0.85 }}>🚙</span>
+                <span className="race-car" style={{ left: `${4 + ((gameIdx * 53) % 70)}%`, top: 76, fontSize: 30, opacity: 0.85 }}>🚗</span>
+                <span className="race-finish">🏁</span>
+              </div>}
               {gameModeId === 'wheel' && <span className={gamePicked !== null ? 'game-spin' : 'game-float'} style={{ fontSize: 56 }}>🎡</span>}
               {gameModeId === 'treasure' && <div style={{ fontSize: 26 }}>{Array.from({ length: gameQs.length }).map((_, i) => <span key={i}>{i < gameCorrect ? '🟢' : i === gameCorrect ? '🧭' : '⚪'}</span>)} 🏴‍☠️</div>}
               {gameModeId === 'streak' && <span className="game-pop" style={{ fontSize: 44 }}>🔥 x{gameStreak}</span>}
